@@ -1,4 +1,2 @@
 # FinancialStuff
-Programs for the course "Applying Mathematics in Finance"
-
-sdasda
+Programs for the course "Applying Mathematics in Finance".
