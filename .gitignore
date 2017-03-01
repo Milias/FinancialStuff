@@ -27,3 +27,12 @@
 *.exe
 *.out
 *.app
+
+# Latex files
+*-eps-converted-to.pdf
+*.out
+*.synctex.gz
+*.log
+*.fdb_latexmk
+*.aux
+*.fls
