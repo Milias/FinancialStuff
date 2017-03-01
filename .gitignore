@@ -36,3 +36,6 @@
 *.fdb_latexmk
 *.aux
 *.fls
+
+# Other
+*.fuse_hidden*
