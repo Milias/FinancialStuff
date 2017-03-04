@@ -12,7 +12,7 @@ function hw1script
     P = linspace(0,1,100); %0.25;
     
     % Random walk histogram
-    nbins = 20;
+    nbins = 80;
     [counts, edges] = histcounts(arrayfun(@(x) randomWalk(aS, aMu, aSigma, aT, nt, true), zeros([1, N])) - aE, nbins);
     
     dlmwrite('../data/rw-hist-N.txt', counts);
