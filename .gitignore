@@ -39,3 +39,5 @@
 
 # Other
 *.fuse_hidden*
+.DS_Store
+*.sync-conflict*
