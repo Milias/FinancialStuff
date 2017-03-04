@@ -1,5 +1,5 @@
 #!/bin/python
-# -*- coding:utf8 -*-
+# -*- coding: utf-8 -*-
 from numpy import *
 import matplotlib.pyplot as plt
 
@@ -12,7 +12,7 @@ def p_oP_plot():
 
   plt.title('Expected profit - risky approach')
   plt.xlabel('P / Risk')
-  plt.ylabel(r'$\langle oP \rangle_r - aE$ / Expected profit')
+  plt.ylabel(r'$\langle oP \rangle_r$ / Expected profit')
 
   plt.savefig('../tex/graphs/P-oP.eps')
   plt.clf()
@@ -26,7 +26,7 @@ def p_profit_plot():
 
   plt.title('Expected profit% - risky approach')
   plt.xlabel('P / Risk')
-  plt.ylabel(r'$\frac{\langle oP \rangle_r}{aE}$ / Expected profit%')
+  plt.ylabel(r'$1+\frac{\langle oP \rangle_r}{aE}$ / Expected profit%')
 
   plt.savefig('../tex/graphs/P-Profit.eps')
   plt.clf()

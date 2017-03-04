@@ -104,10 +104,10 @@ Using this new probability distribution we can compute the risk-free price as th
 We can write this as
 
 \begin{equation}
-  \avg{oP}_{rf} \equiv aE + \avg{\tilde N(\mu, \sigma)} ~~~ ,
+  \avg{oP}_{rf} \equiv \avg{\tilde N(\mu, \sigma)} ~~~ ,
 \end{equation}
 
-where $aE$ is the excercise price and $\avg{oP}_{rf}$ is the option price computed risk-free, and $\tilde N(\mu, \sigma)$ is the adjusted normal distribution.
+where $aE$ is the exercise price and $\avg{oP}_{rf}$ is the option price computed risk-free, and $\tilde N(\mu, \sigma)$ is the adjusted normal distribution.
 
 \subsection{Risky approach}
 
@@ -125,7 +125,7 @@ and then computing the final probability using $P$ as
   \text{cdf}(\avg{oP}_{rf}, \mu, \sigma)(1 - P) + P ~~~ .
 \end{equation*}
 
-Now, what we are doing here is mapping the interval $[\text{cdf}(\avg{oP}_{rf}, \mu, \sigma), 1)$ to $[0, 1)$, so that computing now the inverse cdf of this probability we can map the expected profits interval, $[\avg{oP}_{rf}, \infty)$, to $P \in [0, 1)$. We can write this calculation as
+Now, what we are doing here is mapping the interval $[\text{cdf}(\avg{oP}_{rf}, \mu, \sigma), 1)$ to $[0, 1)$, so that by computing the inverse cdf of this probability we can map the expected profits interval, $[\avg{oP}_{rf}, \infty)$, to $P \in [0, 1)$. We can write this calculation as
 
 \begin{equation}
   \avg{oP}_r \equiv \text{cdf}^{-1} \left( \text{cdf}(\avg{oP}_{rf}, \mu, \sigma)(1 - P) + P \right) ~~~ .
@@ -154,7 +154,7 @@ From this plot we can see that a drift ratio of $0.02$ is not enough to increase
   \end{center}
 \end{figure}
 
-As we can see in Figure \ref{fig:oP_plots}a, the risky-free approach gives a value for the option of $15.25$\euro, however it can be increased by taking more risk as we explained before. In this case we can consider a risk $P = 0.5$ acceptable for a profit\% of around $\sim 5\%$, although still very small. If this were a real option, we would advise against buying it in the first place, and find others with greater expected profits.
+As we can see in Figure \ref{fig:oP_plots}a, the risk-free approach gives a value for the option of $\sim 0.25$\euro, however it can be increased by taking more risk as we explained before. In this case we can consider a risk $P = 0.5$ acceptable for a profit\% of around $\sim 5\%$, although still very small. If this were a real option, we would advise against buying it in the first place, and find others with greater expected profits.
 
 \begin{thebibliography}{28}
 \raggedright
