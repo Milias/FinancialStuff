@@ -29,8 +29,10 @@ function theRandomWalk = randomWalk(aS, aMu, aSigma, aT, nt, last_only)
     % Precompute part of the equation, since it doesn't depend on s(i).
     f = 1.0 + aSigma * dX + aMu * dt;
     
-    % Solving the equation.
-    S = S(1) * cumprod(f);
+    % Computing random walk.
+    for i = 1:nt-1
+        S(i+1) = S(i) * f(i);
+    end
     
     if last_only
         theRandomWalk = S(end);

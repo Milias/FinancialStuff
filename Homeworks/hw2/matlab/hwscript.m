@@ -8,7 +8,7 @@ function hw1script
     
     % Extra optional arguments.
     nt = 101; % 1 time step = 1 day
-    N = 10000; % Amount of random walks to simulate.
+    N = 100000; % Amount of random walks to simulate.
     P = linspace(0,1,100); %0.25;
     
     % Random walk histogram
@@ -25,5 +25,5 @@ function hw1script
     dlmwrite('../data/oP.txt', oP);
     dlmwrite('../data/profit.txt', profit);
     
-    plot(P, oP, 'Linewidth', 3)
+    %plot(P, oP, 'Linewidth', 3)
 end
