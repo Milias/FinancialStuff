@@ -1,0 +1,13 @@
+function stock_price(aS, aMu, aSigma, aE, aT, nt, N, call)
+    x = linspace(aS - 4, 20.0, 100);x = linspace(0.0, 1.0, 50);
+    NoP = 50;
+    
+    [X, Ngrid] = ndgrid(x, 1:NoP);
+    
+    temp = arrayfun(@(x, n) optionPrice(x, aMu, aSigma, aE, aT, nt, N, call), X, Ngrid);
+    oP_mean = mean(temp, 2);
+    oP_std = std(temp, 1.0, 2);
+    
+    dlmwrite('../data/stock_x.txt', x);
+    dlmwrite('../data/stock_oP.txt', oP);
+end

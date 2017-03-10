@@ -11,7 +11,7 @@
 %\usepackage[spanish]{babel}
 \usepackage[cm]{fullpage}
 \usepackage{graphicx}
-\usepackage{float}
+%\usepackage{float}
 \usepackage{bm}
 \usepackage{setspace}
 \usepackage{enumitem}
@@ -25,6 +25,7 @@
 \usepackage{mathabx}
 \usepackage{multicol}
 \usepackage{eurosym}
+\usepackage{caption}
 
 \newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
 
@@ -51,118 +52,123 @@
 \DeclarePairedDelimiter\ceil{\lceil}{\rceil}
 \DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
 
+\newenvironment{Figure}
+  {\par\medskip\noindent\minipage{\linewidth}}
+  {\endminipage\par\medskip}
+
 \begin{document}
 
 \begin{minipage}{\textwidth}
     \centering
-    \Large \textbf{\textsc{Homework 1: An option's fair price}}\\[0.5cm]
+    \Large \textbf{\textsc{Homework 2: Sensitivity and Option Strategies}}
+    \vspace{0.5cm}
 
-    \small \textsc{Francisco García Flórez, Joris van Lammeren, Wouter Varenkamp}\\[0.5cm]
+    \small \textsc{Francisco García Flórez, Joris van Lammeren, Wouter Varenkamp}
+    \vspace{0.5cm}
 
     \begin{minipage}{0.6\textwidth}
-      \textbf{Abstract.} In this first homework we will be computing using a Monte Carlo method the exercise value of a share, which we will then use to determine a fair price for a call option of that share.
+      \textbf{Abstract.} In this exercise we continue using the program written for the last homework, analyzing now the sensitivity of the option prices to changes in several parameters. In the second part, we analyze the stategy \emph{long call option} and compute the \emph{put-call parity}.
     \end{minipage}
 \end{minipage}
 
-\section{Computing the share's value via a Wiener process}
+\vspace{0.5cm}
 
-Firstly, we need to compute the value of the share itself after a certain amount of time. For this purpose we will solve the following stochastic differential equation, known as \emph{Wiener process} \cite{Wilmott}:
+\begin{multicols*}{2}
+\section{Sensitivity of the option price}
 
-\begin{equation}
-  \frac{\dif S}{S} = \sigma \dif X + \mu \dif t ~~~ ,
+Firstly we will show how the option price is affected by changes in several variables of the Weiner process. In the following plots we show the mean and standard deviation values for each one, the second one using error bars. Also, the option price for call options will be shown in red, while the one for put options will be shown in blue.
+
+Some comparisons can be done against the Black-Scholes model, which solves analytically the stochastic differential equation of the Weiner process, giving the following solution \cite{Wilmott} for the probability density distribution of S:
+
+\begin{equation} \label{eq:weinersol}
+  \frac{1}{\sigma S \sqrt{2\pi t}} \exp\left[ -\frac{\left(\log\frac{S}{S_0} - (\mu - \frac{1}{2}\sigma^2)t\right)^2}{2\sigma^2 t}\right] ~~,
 \end{equation}
 
-where $\sigma$ is the volatility, $\mu$ is the drift and $S(t)$ the value of the option as a function of time. Instead of solving it analytically, we can discretize it as in \cite{sde} to find
+also known as lognormal distribution.
 
-\begin{equation}
-  S_{i+1} = S_i \left( 1 + \sigma \Delta W_i + \mu \Delta t_i \right) ~~~ ,
-\end{equation}
+Just by looking at this equation we can predict the behavior of the option price as parameters change --- $\sigma$ and $t$, which will clearly widen the distribution of points as they increase, and $\mu$ or $S_0$ which will shift the whole distribution changing the option price but without affecting the width.
 
-where $\Delta W_i = \sqrt{\Delta t_i} N(0, 1)$, simulating the random walk. In our case the time step is constant, so every $\Delta t_i$ will have the same value. The value after $nt$ time steps is the value at expiration date, which we will use to determine the price of the option.
+\subsection{Initial stock price, $S_0$}
 
-\section{Determining fair prices for call options}
-
-Now that we can compute the exercise value of the share, we can use it to determine how much we can pay for a call option for that share. Since this is not a value that can be derived via an objective procedure, we will consider two approaches to compute the price: the \emph{risk-free approach} and the \emph{risky approach}.
-
-\subsection{Risk-free approach}
-
-For the \textbf{risk-free approach}, we consider the probability distribution of the value of the share at expiration date, which will be a normal $N(\mu, \sigma)$. Now, since buying the call option gives us the \emph{right} to buy the share at the exercise price, we can choose not to use it if that means losing money. To represent this fact, instead of using the previous normal for our computations, we take every instance with share price lower than the exercise price and assign a profit of zero to it, instead of a negative value.
-
-In the following plots we can clearly see that transformation:
-
-\begin{figure}[H]
+\begin{Figure}
   \begin{center}
-    \includegraphics[width=0.4\textwidth]{graphs/ex-normal-1.eps}
-    \includegraphics[width=0.4\textwidth]{graphs/ex-normal-2.eps}
-    \caption{(a) Example of normal distribution $N(1,1)$. (b) Distribution after applying the mentioned transformation, $\tilde N(1,1)$.}
-    \label{fig:ex_normal}
+    \includegraphics[width=0.8\textwidth]{graphs/oP_stock.eps}
+    \captionof{figure}{Value and sensitivity of the option price for a range of initial stock prices. The green line represents the exercise price (15\euro).}
+    \label{fig:stock_sens}
   \end{center}
-\end{figure}
+\end{Figure}
 
-Using this new probability distribution we can compute the risk-free price as the \textbf{average value} of it. This price is the minimum profit that on average we expect to make, so the fair price using this approach would be any amount smaller than the sum of the exercise price plus this value, as much as the writer of the option is willing to accept.
+As we can see in Figure \ref{fig:stock_sens}, changing the initial stock price doesn't affect the option price in an unexpected way, and the standard deviation of our results doesn't increase significantly either. This is expected, since what we are doing here is just moving the distribution of share value at exercise date to higher or lower values, so for lower (higher) values smaller (larger) the probability of making profit and therefore the option price will be lower (higher).
 
-We can write this as
+\subsection{Volatility, $\sigma$}
 
-\begin{equation}
-  \avg{oP}_{rf} \equiv \avg{\tilde N(\mu, \sigma)} ~~~ ,
-\end{equation}
-
-where $aE$ is the exercise price and $\avg{oP}_{rf}$ is the option price computed risk-free, and $\tilde N(\mu, \sigma)$ is the adjusted normal distribution.
-
-\subsection{Risky approach}
-
-On the other hand, we can take a \textbf{risky approach} and pay more than the risk-free price with a smaller probability of having profits. For this to be quantitative we have to assign a risk value to a price, in a way that zero corresponds to making the average profit and one corresponds to the impossible case of having profit paying an infinite amount of money.
-
-So, assuming the expiry values of the share is a random variable with normal distribution, we can introduce the risk as a value $P \in [0, 1)$ and compute the probability of making average profit using the cumulative distribution function (cdf) as
-
-\begin{equation*}
-  \text{cdf}(\avg{oP}_{rf}, \mu, \sigma) ~~~ ,
-\end{equation*}
-
-and then computing the final probability using $P$ as
-
-\begin{equation*}
-  \text{cdf}(\avg{oP}_{rf}, \mu, \sigma)(1 - P) + P ~~~ .
-\end{equation*}
-
-Now, what we are doing here is mapping the interval $[\text{cdf}(\avg{oP}_{rf}, \mu, \sigma), 1)$ to $[0, 1)$, so that by computing the inverse cdf of this probability we can map the expected profits interval, $[\avg{oP}_{rf}, \infty)$, to $P \in [0, 1)$. We can write this calculation as
-
-\begin{equation}
-  \avg{oP}_r \equiv \text{cdf}^{-1} \left( \text{cdf}(\avg{oP}_{rf}, \mu, \sigma)(1 - P) + P \right) ~~~ .
-\end{equation}
-
-\section{Results}
-
-In this section we will use the previous theory with the following values: $\mu = 0.02$, $\sigma = 0.2$, $S(0) = 14$ and $aE = 15$, over a period of $101$ days. In the following histogram we can see the results of performing $N=10^5$ random walks to compute the price of the option at exercise date. From here we can compute the values of $\mu$ and $\sigma$ mentioned in the previous section.
-
-\begin{figure}[H]
+\begin{Figure}
   \begin{center}
-    \includegraphics[width=0.6\textwidth]{graphs/rw-hist.eps}
-    \caption{Histogram showing the distribution of share values after $N=10^5$ random walks.}
-    \label{fig:rw_hist}
+    \includegraphics[width=0.8\textwidth]{graphs/oP_vol.eps}
+    \captionof{figure}{Value and sensitivity of the option price for a range of volatilities.}
+    \label{fig:vol_sens}
   \end{center}
-\end{figure}
+\end{Figure}
 
-From this plot we can see that a drift ratio of $0.02$ is not enough to increase the value of the share significantly, however the volatility increases the width of the normal, and therefore for some value there will be a profit. Now we can proceed to compute the risk-free and risky value for the option. The two graphs below show the profit-risk relation in absolute profit and in percentage given these values.
+In this case we are changing the volatility of the action, so its value at exercise date will have a wider range of values. In other words, we expect the standard deviation of our results to be larger as we can predict by looking at equation (\ref{eq:weinersol}). The denominator of the distribution is given by $2\sigma^2 t$, and it clearly explains this behavior. Also, for $\sigma\rightarrow0$ we find no width at all, since the values will only change due to the drift.
 
-\begin{figure}[H]
+The option price is also increasing, since a higher volatility spreads the share value at expiration date, and since we compute the option price by removing values smaller than the exercise price, it increases the average.
+
+\vfill
+
+\subsection{Duration, $aT$}
+
+\begin{Figure}
   \begin{center}
-    \includegraphics[width=0.4\textwidth]{graphs/P-oP.eps}
-    \includegraphics[width=0.4\textwidth]{graphs/P-Profit.eps}
-    \caption{(a) Expected profit at the exercise date of the option. (b) Expected profit over exercise value of the option.}
-    \label{fig:oP_plots}
+    \includegraphics[width=0.8\textwidth]{graphs/oP_dur.eps}
+    \captionof{figure}{Value and sensitivity of the option price for a range of durations.}
+    \label{fig:dur_sens}
   \end{center}
-\end{figure}
+\end{Figure}
 
-As we can see in Figure \ref{fig:oP_plots}a, the risk-free approach gives a value for the option of $\sim 0.25$\euro, however it can be increased by taking more risk as we explained before. In this case we can consider a risk $P = 0.5$ acceptable for a profit\% of around $\sim 5\%$, although still very small. If this were a real option, we would advise against buying it in the first place, and find others with greater expected profits.
+Again, the error bars widen as $t$ increases, since the standard deviation depends on $\sqrt{t}$ as we can see from equation \ref{eq:weinersol}. Other than that, the option price increases, since the drift has more time to act and thus increase the value of the share. For large $t$ we should include a term of the form $e^{-rt}$, but we will just assume that $r$ is small enough not to make a significant difference in a year.
+
+As we mentioned before, changing $aT$ is similar to a change in $\sigma$ in terms of widening of the distribution, and it shows clearly as Figures \ref{fig:vol_sens} and \ref{fig:dur_sens} both present a similar behavior, the former increasing $\avg{oP}_{rf}$ linearly and the latter as $\sqrt{t}$.
+
+\subsection{Drift, $\mu$}
+
+\begin{Figure}
+  \begin{center}
+    \includegraphics[width=0.8\textwidth]{graphs/oP_drift.eps}
+    \captionof{figure}{Value and sensitivity of the option price for a range of drifts.}
+    \label{fig:drift_sens}
+  \end{center}
+\end{Figure}
+
+Finally, in Figure \ref{fig:drift_sens} we can see how changing the drift produces a very similar result as changing the initial stock price from Figure \ref{fig:stock_sens}, as we predicted by studying equation (\ref{eq:weinersol}). We could check that these two plots are equal when $\log S_0$ and $\mu t$ give the same contribution. Also as we predicted, the standard deviation doesn't significantly change with $\mu$, except for the inherent randomness of the algorithm.
+
+\section{Long call option}
+
+\begin{Figure}
+  \begin{center}
+    \includegraphics[width=0.8\textwidth]{graphs/long_call_option.eps}
+    \captionof{figure}{Diagram of the payoff for the strategy \emph{long call option}.}
+    \label{fig:long_call_option}
+  \end{center}
+\end{Figure}
+
+\section{Put-call parity}
+
+\begin{Figure}
+  \begin{center}
+    \includegraphics[width=0.8\textwidth]{graphs/put_call_parity.eps}
+    \captionof{figure}{Diagram of the payoff showing the \emph{put call parity}.}
+    \label{fig:put_call_parity}
+  \end{center}
+\end{Figure}
+
+\end{multicols*}
 
 \begin{thebibliography}{28}
 \raggedright
 \addcontentsline{toc}{section}{Bibliography}
 
 \bibitem{Wilmott} P. Wilmott et al, \emph{The Mathematics of Financial Derivatives}, 1995.
-
-\bibitem{sde} Timothy Sauer, \emph{Handbook of Computational Statistics}, Springer, pp 529-550, July 2011.
 
 \end{thebibliography}
 

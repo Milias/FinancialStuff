@@ -1,5 +1,5 @@
 function hwscript
-    % Required variables.
+    % Initial variables.
     aS = 14.0;
     aMu = 0.02;
     aSigma = 0.2;
@@ -8,7 +8,33 @@ function hwscript
     
     % Extra optional arguments.
     nt = 101; % 1 time step = 1 day
-    N = 50000; % Amount of random walks to simulate.
+    N = 2000; % Amount of random walks to simulate.
     
-    oP = optionPrice(aS, aMu, aSigma, aE, aT, nt, N)
+    % Changing stock price.
+    
+    disp('Stock price call.')
+    stock_price(aS, aMu, aSigma, aE, aT, nt, N, true)
+    disp('Stock price put.')
+    stock_price(aS, aMu, aSigma, aE, aT, nt, N, false)
+    
+    % Changing volatility.
+    
+    disp('Volatility call.')
+    vol(aS, aMu, aSigma, aE, aT, nt, N, true)
+    disp('Volatility put.')
+    vol(aS, aMu, aSigma, aE, aT, nt, N, false)
+    
+    % Changing duration.
+    
+    disp('Duration call.')
+    dur(aS, aMu, aSigma, aE, aT, nt, N, true)
+    disp('Duration put.')
+    dur(aS, aMu, aSigma, aE, aT, nt, N, false)
+    
+    % Changing drift.
+    
+    disp('Drift call.')
+    option_drift(aS, aMu, aSigma, aE, aT, nt, N, true)
+    disp('Drift put.')
+    option_drift(aS, aMu, aSigma, aE, aT, nt, N, false)
 end
