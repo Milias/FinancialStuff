@@ -110,7 +110,7 @@ As we can see in Figure \ref{fig:stock_sens}, changing the initial stock price d
   \end{center}
 \end{Figure}
 
-In this case we are changing the volatility of the action, so its value at exercise date will have a wider range of values. In other words, we expect the standard deviation of our results to be larger as we can predict by looking at equation (\ref{eq:weinersol}). The denominator of the distribution is given by $2\sigma^2 t$, and it clearly explains this behavior. Also, for $\sigma\rightarrow0$ we find no width at all, since the values will only change due to the drift.
+In this case we are changing the volatility of the share, so its value at exercise date will have a wider range of values. In other words, we expect the standard deviation of our results to be larger as we can predict by looking at equation (\ref{eq:weinersol}). The denominator of the distribution is given by $2\sigma^2 t$, and it clearly explains this behavior. Also, for $\sigma\rightarrow0$ we find no width at all, since the values will only change due to the drift.
 
 The option price is also increasing, since a higher volatility spreads the share value at expiration date, and since we compute the option price by removing values smaller than the exercise price, it increases the average.
 
@@ -126,7 +126,7 @@ The option price is also increasing, since a higher volatility spreads the share
   \end{center}
 \end{Figure}
 
-Again, the error bars widen as $t$ increases, since the standard deviation depends on $\sqrt{t}$ as we can see from equation \ref{eq:weinersol}. Other than that, the option price increases, since the drift has more time to act and thus increase the value of the share. For large $t$ we should include a term of the form $e^{-rt}$, but we will just assume that $r$ is small enough not to make a significant difference in a year.
+Again, the error bars widen as $t$ increases, since the standard deviation depends on $\sqrt{t}$ as we can see from equation \ref{eq:weinersol}. In addition, the option price increases as the drift has more time to act and thus increase the value of the share. For large $t$ we should include a term of the form $e^{-rt}$, but we will just assume that $r$ is small enough not to make a significant difference in a year.
 
 As we mentioned before, changing $aT$ is similar to a change in $\sigma$ in terms of widening of the distribution, and it shows clearly as Figures \ref{fig:vol_sens} and \ref{fig:dur_sens} both present a similar behavior, the former increasing $\avg{oP}_{rf}$ linearly and the latter as $\sqrt{t}$.
 
@@ -144,7 +144,7 @@ Finally, in Figure \ref{fig:drift_sens} we can see how changing the drift produc
 
 \section{$A$/$B$ long call spread}
 
-When using a long call spread you are buying a call option (going long) with a price $A$ and writing a call option (going short) with a price $B$. A is smaller than B and the stock price is usually in between but does not have to be. This limits the risk you are taking, but it also limits your profits to a maximum value.
+When using a long call spread you are buying a call option (going long) with a price $A$ and writing a call option (going short) with a price $B$. $A$ is smaller than $B$ and the stock price is usually in between but does not have to be. This limits the risk you are taking, but it also limits your profits to a maximum value.
 
 \begin{Figure}
   \begin{center}
@@ -160,7 +160,7 @@ In the case of the 10/20 long call spread and the start stock price of 15 it wou
 
 \section{Put-call parity}
 
-In a put-call parity you buy a put option, $P$, and you write a call option, $C$, with the same exercise price $E$, you also have an actual asset of the stock. So your package is: $S + P - C$. In this case you keep the options until the expiring date. At the expiring date there are two options. The stock price is smaller than the exercise price. In this case the call option will not be used, but the put option will. This makes the profit of the package $S + (E-S) - 0 = E$ minus the price of the package off course. When the stock price is bigger than the exercise price the call option will be used and the put option will not be used. Your profit is then $S + 0 -(S-E) = E$.
+In a put-call parity you buy a put option, $P$, and you write a call option, $C$, with the same exercise price $E$, you also have an actual asset of the stock. So the cost of the portfolio is $S + P - C$. In this case you keep the options until the expiring date. At the expiring date there are two options. The stock price is smaller than the exercise price. In this case the call option will not be used, but the put option will. This makes the profit of the portfolio $S + ( E - S ) - 0 = E$ minus the price of the portfolio. When the stock price is bigger than the exercise price the call option will be used and the put option will not be used. Your profit is then $S + 0 - ( S - E ) = E$.
 
 \begin{Figure}
   \begin{center}
@@ -170,12 +170,12 @@ In a put-call parity you buy a put option, $P$, and you write a call option, $C$
   \end{center}
 \end{Figure}
 
-In Figure \ref{fig:put_call_parity} we see that the dashed line is the profit for every value of the stock price, minus the net costs of the package, but we set that to 0 in this example. Figure \ref{fig:put_call_parity} shows that when you can acquire such a package for a price smaller than $E$ you will always make a profit.
+In Figure \ref{fig:put_call_parity} we see that the dashed line is the profit for every value of the stock price, minus the net costs of the portfolio, but we set that to 0 in this example. Figure \ref{fig:put_call_parity} shows that when you can acquire such a portfolio for a price smaller than $E$ you will always make a profit.
 
 The put-call parity formula is then
 
 \begin{equation*}
-    S + P - C = Ee^{-r(T-t)} ~~,
+    S + P - C = E e^{-r(T-t)} ~~,
 \end{equation*}
 
 where $r$ represents the interest rate. This is based on the principle that having money now has more worth than having the same amount of money in the future. It is the same as discounting $S + P - C$.
