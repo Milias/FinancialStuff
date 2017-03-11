@@ -142,36 +142,43 @@ As we mentioned before, changing $aT$ is similar to a change in $\sigma$ in term
 
 Finally, in Figure \ref{fig:drift_sens} we can see how changing the drift produces a very similar result as changing the initial stock price from Figure \ref{fig:stock_sens}, as we predicted by studying equation (\ref{eq:weinersol}). We could check that these two plots are equal when $\log S_0$ and $\mu t$ give the same contribution. Also as we predicted, the standard deviation doesn't significantly change with $\mu$, except for the inherent randomness of the algorithm.
 
-\section{Long call spread}
-When using a long call spread you are buying a call option (going long) with a price A and writing a call option (going short) with a price B. A is smaller than B and the stock price is usually in between but does not have to be. This limits the risk you are taking, but it also limits your profits to a maximum value.
+\section{$A$/$B$ long call spread}
+
+When using a long call spread you are buying a call option (going long) with a price $A$ and writing a call option (going short) with a price $B$. A is smaller than B and the stock price is usually in between but does not have to be. This limits the risk you are taking, but it also limits your profits to a maximum value.
+
 \begin{Figure}
   \begin{center}
     \includegraphics[width=0.8\textwidth]{graphs/long_call_option.eps}
-    \captionof{figure}{Diagram of the payoff for the strategy \emph{long call option}.}
+    \captionof{figure}{Diagram of the payoff for the strategy \emph{long call option}. In this case $A=10$ and $B=20$.}
     \label{fig:long_call_option}
   \end{center}
 \end{Figure}
-In figure the pay off diagram of the long call spread is shown. There are three possible scenarios. If the stock price drops below A you make a loss equal to the net amount of cash you paid for both the options. If the stock price is between A and B your profit is the difference between the stock price and A minus the net amount paid for the options, this might still be negative. If the stock price is bigger than B both options will be used. So your profit is the difference between A and B minus the net amount paid for the options. This is your maximum potential profit. 
 
-In the case of the 10/20 long call spread and the start stock price of 15 you off course would like the stock price to go up. The closer to B the higher your profit will be. You do not want the stock price to become much higher than B, this will not change your profit. But this would mean you made a bad move by putting a ceiling to your profit in exchange for a smaller loss.
+In Figure \ref{fig:long_call_option} the pay off diagram of the long call spread is shown. There are three possible scenarios. If the stock price drops below $A$ you make a loss equal to the net amount of cash you paid for both the options. If the stock price is between $A$ and $B$ your profit is the difference between the stock price and $A$ minus the net amount paid for the options, this might still be negative. If the stock price is bigger than $B$ both options will be used. So your profit is the difference between $A$ and $B$ minus the net amount paid for the options. This is your maximum potential profit.
+
+In the case of the 10/20 long call spread and the start stock price of 15 it would be preferable for the stock price to go up. The closer to $B$ the higher your profit will be. However, the stock price shouldn't become much higher than $B$, as profits won't increase further. But this would mean you made a bad move by putting a ceiling to your profit in exchange for a smaller loss.
+
 \section{Put-call parity}
-In a put-call parity you buy a put option and you write a call option with the same exercise price, you also have an actual asset of the stock. So your package is: $S + P - C$. In this case you keep the options until the expiring date. At the expiring date there are two options. The stock price is smaller than the exercise price. In this case the call option will not be used, but the put option will. This makes the profit of the package $S + (E-S) - 0 = E$ minus the price of the package off course. When the stock price is bigger than the exercise price the call option will be used and the put option will not be used. Your profit is then $S + 0 -(S-E) = E$.
+
+In a put-call parity you buy a put option, $P$, and you write a call option, $C$, with the same exercise price $E$, you also have an actual asset of the stock. So your package is: $S + P - C$. In this case you keep the options until the expiring date. At the expiring date there are two options. The stock price is smaller than the exercise price. In this case the call option will not be used, but the put option will. This makes the profit of the package $S + (E-S) - 0 = E$ minus the price of the package off course. When the stock price is bigger than the exercise price the call option will be used and the put option will not be used. Your profit is then $S + 0 -(S-E) = E$.
+
 \begin{Figure}
   \begin{center}
     \includegraphics[width=0.8\textwidth]{graphs/put_call_parity.eps}
-    \captionof{figure}{Diagram of the payoff showing the \emph{put call parity}.}
+    \captionof{figure}{Diagram of the payoff showing the \emph{put-call parity}.}
     \label{fig:put_call_parity}
   \end{center}
 \end{Figure}
-In figure 6 wee see that the dashed line is the profit for every value of the stock price, minus the net costs of the package off course, but we set that to 0 in this example. Figure 6 shows that when you can acquire such a package for a price smaller than $E$ you will always make a profit. 
 
-The Put-call parity formula is:
-\begin{equation}
-    S + P - C = Ee^{-r(T-t)}
-\end{equation}
+In Figure \ref{fig:put_call_parity} we see that the dashed line is the profit for every value of the stock price, minus the net costs of the package, but we set that to 0 in this example. Figure \ref{fig:put_call_parity} shows that when you can acquire such a package for a price smaller than $E$ you will always make a profit.
 
-In this equation $r$ represents the interest rate. This is based on the principle that having money now has more worth than having the same amount of money in the future. It is the same as discounting $S + P - C$.
-\end{multicols*}
+The put-call parity formula is then
+
+\begin{equation*}
+    S + P - C = Ee^{-r(T-t)} ~~,
+\end{equation*}
+
+where $r$ represents the interest rate. This is based on the principle that having money now has more worth than having the same amount of money in the future. It is the same as discounting $S + P - C$.
 
 \begin{thebibliography}{28}
 \raggedright
@@ -180,5 +187,7 @@ In this equation $r$ represents the interest rate. This is based on the principl
 \bibitem{Wilmott} P. Wilmott et al, \emph{The Mathematics of Financial Derivatives}, 1995.
 
 \end{thebibliography}
+
+\end{multicols*}
 
 \end{document}
