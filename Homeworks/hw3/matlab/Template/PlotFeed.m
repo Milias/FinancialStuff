@@ -1,2 +1,0 @@
-function PlotFeed(aFeed)
-end
