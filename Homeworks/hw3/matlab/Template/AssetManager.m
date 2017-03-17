@@ -5,7 +5,7 @@ classdef AssetManager
   end
 
   methods
-    function self = AssetsManager
+    function self = AssetManager
       self.Assets = struct('price', [], 'volume', [], 'total_volume', 0);
       self.Prices = struct('EUR', struct('bid', [], 'ask', []), 'CHI', struct('bid', [], 'ask', []));
     end

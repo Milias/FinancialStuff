@@ -2,7 +2,7 @@ clear myExchange;
 clear myFeedPublisher;
 clear myTradingRobot;
 
-load('AKZA1.mat');
+load('AKZA2.mat');
 
 myExchange = CreateExchangeArb();
 
@@ -10,11 +10,10 @@ myFeedPublisher = FeedPublisher();
 myExchange.RegisterAutoTrader(myFeedPublisher);
 myFeedPublisher.StartAutoTrader(myExchange);
 
-myTradingRobot = PlotFeedRobot();
+myTradingRobot = TradingRobot();
 myExchange.RegisterAutoTrader(myTradingRobot);
 myTradingRobot.StartAutoTrader(myExchange);
 
-myFeedPublisher.StartVeryShortFeed(myFeed);
+myFeedPublisher.StartFeed(myFeed);
 
 Report(myTradingRobot.ownTrades);
-%ReportFeed(myTradingRobot)
