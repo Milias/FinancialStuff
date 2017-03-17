@@ -6,9 +6,10 @@ classdef TradingRobot < AutoTrader
 
   methods
     function self = TradingRobot
+      % Depths are initialized here.
       self.EURDepth = struct('ISIN', 'EUR_AKZA', 'tickSize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
 
-      self.CHIDepth = struct('ISIN', 'CHI0_AKZA', 'tickSize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
+      self.CHIDepth = struct('ISIN', 'CHI_AKZA', 'tickSize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
     end
 
     function HandleDepthUpdate(self, ~, aDepth)
@@ -20,10 +21,12 @@ classdef TradingRobot < AutoTrader
         self.CHIDepth = aDepth;
       end
 
+      % Let's make some money.
       self.Arbitrage();
     end
 
     function UpdateSavedDepth(self, aDepth, aP, aV)
+      % This function updates the depth objects after a trade.
       % aV > 0 means buy, aV < 0 means sell.
       if aV > 0
         myPrice = aDepth.askLimitPrice;
@@ -33,6 +36,7 @@ classdef TradingRobot < AutoTrader
         myVolume = aDepth.bidVolume;
       end
 
+      % Find changed values.
       myIndex = abs(myPrice - aP) < 0.001;
       if int32(abs(aV)) == int32(myVolume(myIndex))
         myPrice = myPrice(myIndex == false);
@@ -41,6 +45,7 @@ classdef TradingRobot < AutoTrader
         myVolume(myIndex) = myVolume(myIndex) - abs(aV);
       end
 
+      % Update depth.
       switch aDepth.ISIN
       case 'EUR_AKZA'
         if aV > 0
@@ -62,6 +67,7 @@ classdef TradingRobot < AutoTrader
     end
 
     function [theConfirmation] = Buy(self, aISIN, aP, aV)
+      % Helper function for buying stock.
       myCurrentTrades = size(self.ownTrades.price, 1);
 
       self.SendNewOrder(aP, aV, 1, {aISIN}, {'IMMEDIATE'}, 0);
@@ -78,6 +84,7 @@ classdef TradingRobot < AutoTrader
     end
 
     function [theConfirmation] = Sell(self, aISIN, aP, aV)
+      % Helper function for selling stock.
       myCurrentTrades = size(self.ownTrades.price, 1);
 
       self.SendNewOrder(aP, aV, -1, {aISIN}, {'IMMEDIATE'}, 0);
@@ -94,19 +101,27 @@ classdef TradingRobot < AutoTrader
     end
 
     function Arbitrage(self)
+      % Money making function.
+
+      % First indices of profitable trades are computed.
       myIndexCE = bsxfun(@lt, self.CHIDepth.askLimitPrice', self.EURDepth.bidLimitPrice);
       myIndexEC = bsxfun(@lt, self.EURDepth.askLimitPrice', self.CHIDepth.bidLimitPrice);
 
+      % Buying in CHI and selling in EUR.
       if any(myIndexCE)
+        % Generating possible combinations of prices and volumes.
         [ myPricesX, myPricesY ] = ndgrid(self.CHIDepth.askLimitPrice, self.EURDepth.bidLimitPrice);
         [ myVolumesX, myVolumesY ] = ndgrid(self.CHIDepth.askVolume, self.EURDepth.bidVolume);
+
+        % This is the maximum stock the market can buy and sell.
         myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
 
+        % Finally, buying and selling the stock, making a profit of (myPricesX - myPricesY)*myLimitVolume.
         myConfirmation = arrayfun(@(aP, aV) self.Buy('CHI_AKZA', aP, aV), myPricesX(myIndexCE), myLimitVolume(myIndexCE));
-
         arrayfun(@(aP, aV, aC) self.Sell('EUR_AKZA', aP, aV*aC), myPricesY(myIndexCE), myLimitVolume(myIndexCE), myConfirmation);
       end
 
+      % Buying in EUR and selling in CHI.
       if any(myIndexEC)
         [ myPricesX, myPricesY ] = ndgrid(self.EURDepth.askLimitPrice, self.CHIDepth.bidLimitPrice);
         [ myVolumesX, myVolumesY ] = ndgrid(self.EURDepth.askVolume, self.CHIDepth.bidVolume);
