@@ -73,7 +73,7 @@ classdef TradingRobot < AutoTrader
       self.SendNewOrder(aP, aV, 1, {aISIN}, {'IMMEDIATE'}, 0);
 
       theConfirmation = size(self.ownTrades.price, 1) > myCurrentTrades;
-      fprintf('Buy  (%d): %10s, %3.2f, %3.0f\n', theConfirmation, aISIN, aP, aV);
+      %fprintf('Buy  (%d): %10s, %3.2f, %3.0f\n', theConfirmation, aISIN, aP, aV);
 
       switch aISIN
       case 'EUR_AKZA'
@@ -90,7 +90,7 @@ classdef TradingRobot < AutoTrader
       self.SendNewOrder(aP, aV, -1, {aISIN}, {'IMMEDIATE'}, 0);
 
       theConfirmation = size(self.ownTrades.price, 1) > myCurrentTrades;
-      fprintf('Sell (%1d): %10s, %3.2f, %3.0f\n', theConfirmation, aISIN, aP, aV);
+      %fprintf('Sell (%1d): %10s, %3.2f, %3.0f\n', theConfirmation, aISIN, aP, aV);
 
       switch aISIN
       case 'EUR_AKZA'
@@ -116,7 +116,7 @@ classdef TradingRobot < AutoTrader
         % This is the maximum stock the market can buy and sell.
         myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
 
-        % Finally, buying and selling the stock, making a profit of (myPricesX - myPricesY)*myLimitVolume.
+        % Finally, buying and selling the stock, making a profit of (myPricesY - myPricesX) * myLimitVolume.
         myConfirmation = arrayfun(@(aP, aV) self.Buy('CHI_AKZA', aP, aV), myPricesX(myIndexCE), myLimitVolume(myIndexCE));
         arrayfun(@(aP, aV, aC) self.Sell('EUR_AKZA', aP, aV*aC), myPricesY(myIndexCE), myLimitVolume(myIndexCE), myConfirmation);
       end
@@ -125,10 +125,10 @@ classdef TradingRobot < AutoTrader
       if any(myIndexEC)
         [ myPricesX, myPricesY ] = ndgrid(self.EURDepth.askLimitPrice, self.CHIDepth.bidLimitPrice);
         [ myVolumesX, myVolumesY ] = ndgrid(self.EURDepth.askVolume, self.CHIDepth.bidVolume);
+
         myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
 
         myConfirmation = arrayfun(@(aP, aV) self.Buy('EUR_AKZA', aP, aV), myPricesX(myIndexEC), myLimitVolume(myIndexEC));
-
         arrayfun(@(aP, aV, aC) self.Sell('CHI_AKZA', aP, aV*aC), myPricesY(myIndexEC), myLimitVolume(myIndexEC), myConfirmation);
       end
     end

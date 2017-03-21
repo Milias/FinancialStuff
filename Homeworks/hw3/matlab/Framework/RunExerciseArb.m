@@ -2,7 +2,7 @@ clear myExchange;
 clear myFeedPublisher;
 clear myTradingRobot;
 
-load('AKZA1.mat');
+load('AKZA4.mat');
 
 myExchange = CreateExchangeArb();
 
