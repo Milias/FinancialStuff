@@ -74,35 +74,22 @@
 \vspace{0.5cm}
 
 \begin{multicols*}{2}
-\section{Conclusion}
 
-<<<<<<< HEAD
 \section{Trading robot}
 
 \subsection{Algorithm}
 
 \subsection{Implementation}
 
+The previous algorithm is fundamentally implemented in three separate steps, executed every time there is a book update. These three steps are \emph{offers and bids checking}, \emph{trading} and \emph{book updating}.
+
 \section{Results}
 
-\begin{center}
-  \begin{tabular}{|c|c|c|c|c|c|}
-    \hline
-    \# & CHI (Buy) & CHI (Sell) & EUR (Buy) & EUR (Sell) & Profit \\ \hline
-    \input{tables/profits.tex}
-  \end{tabular}
-\end{center}
+As we can see in Table \ref{table:assets}
 
-\begin{center}
-  \begin{tabular}{|c|c|c|c|c|c|}
-    \hline
-    \# & CHI (Buy) & CHI (Sell) & EUR (Buy) & EUR (Sell) & Pos. \\ \hline
-    \input{tables/assets.tex}
-  \end{tabular}
-\end{center}
+\section{Conclusion}
 
-Our main conclusion is that it takes a high investment to make a small profit. This seems like it is not a good investment,
-but there is no chance on making a loss. So we make a small risk-free profit without the risk of making a loss.
+Our main conclusion is that it takes a high investment to make a small profit. This seems like it is not a good investment, but there is no chance on making a loss. So we make a small risk-free profit without the risk of making a loss.
 
 \begin{thebibliography}{28}
 \raggedright
@@ -113,5 +100,31 @@ but there is no chance on making a loss. So we make a small risk-free profit wit
 \end{thebibliography}
 
 \end{multicols*}
+
+\section{Appendix}
+
+\begin{center}
+  \Large
+  \captionof{table}{Cash moved for each feed.}
+  \label{table:cash}
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    \# & CHI (Buy) & CHI (Sell) & EUR (Buy) & EUR (Sell) & Profit \\ \hline
+    \input{tables/profits.tex}
+  \end{tabular}
+\end{center}
+
+\vspace{1.0cm}
+
+\begin{center}
+  \Large
+  \captionof{table}{Assets moved for each feed.}
+  \label{table:assets}
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    \# & CHI (Buy) & CHI (Sell) & EUR (Buy) & EUR (Sell) & Position \\ \hline
+    \input{tables/assets.tex}
+  \end{tabular}
+\end{center}
 
 \end{document}
