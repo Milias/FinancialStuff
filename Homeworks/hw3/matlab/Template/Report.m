@@ -7,7 +7,7 @@ function Report(aTrades)
     myTimePerf.cash = cumsum(- aTrades.side .* aTrades.price .* aTrades.volume);
 
     x = 1:size(myTimePerf.assets, 1);
-    plot(x, myTimePerf.assets, 'r-', x, myTimePerf.cash, 'b-', 'LineWidth', 2)
+    %plot(x, myTimePerf.assets, 'r-', x, myTimePerf.cash, 'b-', 'LineWidth', 2)
 
     myData = struct('assets', [ 0 0 ; 0 0 ], 'cash', [ 0 0 ; 0 0 ]);
 
@@ -25,6 +25,6 @@ function Report(aTrades)
     %fprintf('%9s\n%9d/%8d, %9d/%8d, %9d\n', 'Totals', myData.assets, sum(sum(myData.assets)))
     %fprintf('%9.2f/%8.2f, %9.2f/%8.2f, %9.2f\n', myData.cash, sum(sum(myData.cash)))
 
-    fprintf('%9s\nFeed (Assets) & %9d & %8d & %9d & %8d & %9d \\\\ \\hline\n', 'Totals', myData.assets, sum(sum(myData.assets)))
-    fprintf('Feed (Cash) & %9.2f & %8.2f & %9.2f & %8.2f & %9.2f \\\\ \\hline\n', myData.cash, sum(sum(myData.cash)))
+    fprintf('%9s\n & %9d & %8d & %9d & %8d & %9d \\\\ \\hline\n', 'Totals', myData.assets, sum(sum(myData.assets)))
+    fprintf(' & %9.2f & %8.2f & %9.2f & %8.2f & %9.2f \\\\ \\hline\n', myData.cash, sum(sum(myData.cash)))
 end

@@ -104,32 +104,37 @@ classdef TradingRobot < AutoTrader
       % Money making function.
 
       % First indices of profitable trades are computed.
-      myIndexCE = bsxfun(@lt, self.CHIDepth.askLimitPrice', self.EURDepth.bidLimitPrice);
-      myIndexEC = bsxfun(@lt, self.EURDepth.askLimitPrice', self.CHIDepth.bidLimitPrice);
+      if size(self.CHIDepth.askLimitPrice, 1) > 0 && size(self.EURDepth.bidLimitPrice, 1) > 0
+        myIndexCE = bsxfun(@lt, self.CHIDepth.askLimitPrice, self.EURDepth.bidLimitPrice');
 
-      % Buying in CHI and selling in EUR.
-      if any(myIndexCE)
-        % Generating possible combinations of prices and volumes.
-        [ myPricesX, myPricesY ] = ndgrid(self.CHIDepth.askLimitPrice, self.EURDepth.bidLimitPrice);
-        [ myVolumesX, myVolumesY ] = ndgrid(self.CHIDepth.askVolume, self.EURDepth.bidVolume);
+        % Buying in CHI and selling in EUR.
+        if any(myIndexCE(:))
+          % Generating possible combinations of prices and volumes.
+          [ myPricesX, myPricesY ] = ndgrid(self.CHIDepth.askLimitPrice, self.EURDepth.bidLimitPrice);
+          [ myVolumesX, myVolumesY ] = ndgrid(self.CHIDepth.askVolume, self.EURDepth.bidVolume);
 
-        % This is the maximum stock the market can buy and sell.
-        myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
+          % This is the maximum stock the market can buy and sell.
+          myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
 
-        % Finally, buying and selling the stock, making a profit of (myPricesY - myPricesX) * myLimitVolume.
-        myConfirmation = arrayfun(@(aP, aV) self.Buy('CHI_AKZA', aP, aV), myPricesX(myIndexCE), myLimitVolume(myIndexCE));
-        arrayfun(@(aP, aV, aC) self.Sell('EUR_AKZA', aP, aV*aC), myPricesY(myIndexCE), myLimitVolume(myIndexCE), myConfirmation);
+          % Finally, buying and selling the stock, making a profit of (myPricesY - myPricesX) * myLimitVolume.
+          myConfirmation = arrayfun(@(aP, aV) self.Buy('CHI_AKZA', aP, aV), myPricesX(myIndexCE), myLimitVolume(myIndexCE));
+          arrayfun(@(aP, aV, aC) self.Sell('EUR_AKZA', aP, aV*aC), myPricesY(myIndexCE), myLimitVolume(myIndexCE), myConfirmation);
+        end
       end
 
-      % Buying in EUR and selling in CHI.
-      if any(myIndexEC)
-        [ myPricesX, myPricesY ] = ndgrid(self.EURDepth.askLimitPrice, self.CHIDepth.bidLimitPrice);
-        [ myVolumesX, myVolumesY ] = ndgrid(self.EURDepth.askVolume, self.CHIDepth.bidVolume);
+      if size(self.EURDepth.askLimitPrice, 1) > 0 && size(self.CHIDepth.bidLimitPrice, 1) > 0
+        myIndexEC = bsxfun(@lt, self.EURDepth.askLimitPrice, self.CHIDepth.bidLimitPrice');
 
-        myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
+        % Buying in EUR and selling in CHI.
+        if any(myIndexEC(:))
+          [ myPricesX, myPricesY ] = ndgrid(self.EURDepth.askLimitPrice, self.CHIDepth.bidLimitPrice);
+          [ myVolumesX, myVolumesY ] = ndgrid(self.EURDepth.askVolume, self.CHIDepth.bidVolume);
 
-        myConfirmation = arrayfun(@(aP, aV) self.Buy('EUR_AKZA', aP, aV), myPricesX(myIndexEC), myLimitVolume(myIndexEC));
-        arrayfun(@(aP, aV, aC) self.Sell('CHI_AKZA', aP, aV*aC), myPricesY(myIndexEC), myLimitVolume(myIndexEC), myConfirmation);
+          myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
+
+          myConfirmation = arrayfun(@(aP, aV) self.Buy('EUR_AKZA', aP, aV), myPricesX(myIndexEC), myLimitVolume(myIndexEC));
+          arrayfun(@(aP, aV, aC) self.Sell('CHI_AKZA', aP, aV*aC), myPricesY(myIndexEC), myLimitVolume(myIndexEC), myConfirmation);
+        end
       end
     end
   end
