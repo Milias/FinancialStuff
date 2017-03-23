@@ -102,9 +102,10 @@ classdef TradingRobot < AutoTrader
 
     function Arbitrage(self)
       % Money making function.
+      mySizes = [ size(self.CHIDepth.askLimitPrice, 1) size(self.EURDepth.bidLimitPrice, 1) size(self.EURDepth.askLimitPrice, 1) size(self.CHIDepth.bidLimitPrice, 1) ];
 
       % First indices of profitable trades are computed.
-      if size(self.CHIDepth.askLimitPrice, 1) > 0 && size(self.EURDepth.bidLimitPrice, 1) > 0
+      if all(mySizes(1:2))
         myIndexCE = bsxfun(@lt, self.CHIDepth.askLimitPrice, self.EURDepth.bidLimitPrice');
 
         % Buying in CHI and selling in EUR.
@@ -115,14 +116,14 @@ classdef TradingRobot < AutoTrader
 
           % This is the maximum stock the market can buy and sell.
           myLimitVolume = arrayfun(@min, myVolumesX, myVolumesY);
-
+          
           % Finally, buying and selling the stock, making a profit of (myPricesY - myPricesX) * myLimitVolume.
           myConfirmation = arrayfun(@(aP, aV) self.Buy('CHI_AKZA', aP, aV), myPricesX(myIndexCE), myLimitVolume(myIndexCE));
           arrayfun(@(aP, aV, aC) self.Sell('EUR_AKZA', aP, aV*aC), myPricesY(myIndexCE), myLimitVolume(myIndexCE), myConfirmation);
         end
       end
 
-      if size(self.EURDepth.askLimitPrice, 1) > 0 && size(self.CHIDepth.bidLimitPrice, 1) > 0
+      if all(mySizes(3:4))
         myIndexEC = bsxfun(@lt, self.EURDepth.askLimitPrice, self.CHIDepth.bidLimitPrice');
 
         % Buying in EUR and selling in CHI.

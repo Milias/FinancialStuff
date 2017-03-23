@@ -1,19 +1,21 @@
-clear myExchange;
-clear myFeedPublisher;
-clear myTradingRobot;
+function RunExerciseArb(aFeed)
+  clear myExchange;
+  clear myFeedPublisher;
+  clear myTradingRobot;
 
-load('AKZA5.mat');
+  load(aFeed);
 
-myExchange = CreateExchangeArb();
+  myExchange = CreateExchangeArb();
 
-myFeedPublisher = FeedPublisher();
-myExchange.RegisterAutoTrader(myFeedPublisher);
-myFeedPublisher.StartAutoTrader(myExchange);
+  myFeedPublisher = FeedPublisher();
+  myExchange.RegisterAutoTrader(myFeedPublisher);
+  myFeedPublisher.StartAutoTrader(myExchange);
 
-myTradingRobot = TradingRobot();
-myExchange.RegisterAutoTrader(myTradingRobot);
-myTradingRobot.StartAutoTrader(myExchange);
+  myTradingRobot = TradingRobot();
+  myExchange.RegisterAutoTrader(myTradingRobot);
+  myTradingRobot.StartAutoTrader(myExchange);
 
-myFeedPublisher.StartFeed(myFeed);
+  myFeedPublisher.StartFeed(myFeed);
 
-Report(myTradingRobot.ownTrades);
+  Report(myTradingRobot.ownTrades);
+end
