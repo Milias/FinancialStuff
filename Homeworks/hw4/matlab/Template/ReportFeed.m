@@ -1,19 +1,22 @@
 function ReportFeed(aFeedRobot)
-  myIsinLabels = {'EUR_AKZA', 'CHI_AKZA'};
+  myIsinLabels = unique(arrayfun(@(aDepth) aDepth.ISIN, aFeedRobot.DepthHistory, 'UniformOutput', false));
 
   myX = 1:size(aFeedRobot.DepthHistory, 2);
 
   myIsins = arrayfun(@(x) x.ISIN, aFeedRobot.DepthHistory, 'UniformOutput', false);
-  myIndex = [ strcmp(myIsins, myIsinLabels(1)) ; strcmp(myIsins, myIsinLabels(2)) ];
+  myIndex = arrayfun(@(x) strcmp(myIsins, x), myIsinLabels, 'UniformOutput', false);
 
-  myAskEUR = arrayfun(@(aDepth) sum(aDepth.askLimitPrice .* aDepth.askVolume) / sum(aDepth.askVolume) / (strcmp(aDepth.ISIN,myIsinLabels(1))), aFeedRobot.DepthHistory);
+  % In first instance we plot the weighted average of both ask and bid entries.
+  myValues = arrayfun(@(aDepth) sum([ aDepth.askLimitPrice .* aDepth.askVolume ; aDepth.bidLimitPrice .* aDepth.bidVolume ]) / (sum(aDepth.askVolume) + sum(aDepth.bidVolume)), aFeedRobot.DepthHistory);
 
-  myAskCHI = arrayfun(@(aDepth) sum(aDepth.askLimitPrice .* aDepth.askVolume) / sum(aDepth.askVolume) / (strcmp(aDepth.ISIN,myIsinLabels(2))), aFeedRobot.DepthHistory);
+  for i=1:size(myIsinLabels, 2)
+    myIndexLogical = cell2mat(myIndex(i));
+    plot(myX(myIndexLogical & ~isnan(myValues)), myValues(myIndexLogical & ~isnan(myValues)), '-', 'LineWidth', 3);
+    hold on
+  end
+  
+  hold off
+  legend(myIsinLabels)
 
-  myBidEUR = arrayfun(@(aDepth) sum(aDepth.bidLimitPrice .* aDepth.bidVolume) / sum(aDepth.bidVolume) / (strcmp(aDepth.ISIN,myIsinLabels(1))), aFeedRobot.DepthHistory);
-
-  myBidCHI = arrayfun(@(aDepth) sum(aDepth.bidLimitPrice .* aDepth.bidVolume) / sum(aDepth.bidVolume) / (strcmp(aDepth.ISIN,myIsinLabels(2))), aFeedRobot.DepthHistory);
-
-  plot(myX, myAskEUR, 'r-', myX, myBidEUR, 'b-', myX, myAskCHI, 'k-', myX, myBidCHI, 'g-', 'LineWidth', 2)
-  legend('ask\_EUR', 'bid\_EUR', 'ask\_CHI', 'bid\_CHI');
 end
+

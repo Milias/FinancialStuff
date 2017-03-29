@@ -11,5 +11,9 @@ classdef PlotFeedRobot < AutoTrader
     function HandleDepthUpdate(self, ~, aDepth)
       self.DepthHistory = [ self.DepthHistory aDepth ];
     end
+    
+    function Unwind(self)
+    end
   end
 end
+
