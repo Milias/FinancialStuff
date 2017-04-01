@@ -39,6 +39,9 @@
 *.fdb_latexmk
 *.aux
 *.fls
+*.dvi
+texput.pdf
+*.swp
 
 # Other
 *.fuse_hidden*
