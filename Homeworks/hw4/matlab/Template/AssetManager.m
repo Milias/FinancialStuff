@@ -1,35 +1,29 @@
-classdef AssetManager
+classdef AssetManager < handle
   properties
-    ISINs
-    Assets
-    DepthHistory
-
-    CurrentUpdateIndex
-    CurrentDepth
+    % Struct where we store the price and volume of our assets.
+    % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0, 'index', 0)}.
+    Assets = struct;
+      
+    % Struct of vectors containing depths for each ISIN.
+    % Structure: self.DepthHistory.ISIN = {}.
+    DepthHistory = struct;
+      
+    % Vector of stored ISINs.
+    ISINs = cell(0);
+    
+    % Keeping track of how many book updates we've received.
+    CurrentUpdateIndex = 0;
   end
 
   methods
-    function self = AssetManager(aISINs)
+    function Init(self, aISINs)
       if nargin == 0
         aISINs = {};
       end
 
-      % Struct where we store the price and volume of our assets.
-      % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0, 'index', 0)}.
-      self.Assets = struct;
-      
-      % Struct of vectors containing depths for each ISIN.
-      % Structure: self.DepthHistory.ISIN = {}.
-      self.DepthHistory = struct;
-      
-      % Vector of stored ISINs.
-      self.ISINs = cell(0);
       for i = 1:size(aISINs, 2)
-        self.CheckISIN(aISINs{i});
+        self.CheckISIN(aISINs{i})
       end
-
-      % Keeping track of how many book updates we've received.
-      CurrentUpdateIndex = 0;
     end
 
     function theVolume = GetCurrentVolume(self, aISIN, aP)
@@ -42,31 +36,26 @@ classdef AssetManager
     end
 
     function theIndices = GetIndicesLowerThan(self, aISIN, aP)
-      theIndices = self.Assets.price < aP;
+      theIndices = cellfun(@(trade) trade.price < aP, self.Assets.(aISIN));
     end
 
     function theMeanPrice = GetMeanPrice(self, aP, aV)
-      theMeanPrice = sum(aP.*aV)/sum(aV);
+      theMeanPrice = sum(aP .* aV) / sum(aV);
     end
 
     function theTradeStruct = NewTrade(self, aP, aV)
-      theTradeStruct = struct('price', aP, 'volume', aV, 'index', CurrentUpdateIndex);
+      theTradeStruct = struct('price', aP, 'volume', aV, 'index', self.CurrentUpdateIndex);
     end
 
     function UpdateDepths(self, aDepth)
-      self.AddToCellArray(self.DepthHistory.(aDepth.ISIN), aDepth);
-      self.CurrentDepth = aDepth;
       self.CurrentUpdateIndex = self.CurrentUpdateIndex + 1;
-    end
-
-    function AddToCellArray(self, aCell, aNew)
-      aCell{size(aCell, 2) + 1} = aNew;
+      self.DepthHistory.(aDepth.ISIN){size(self.DepthHistory.(aDepth.ISIN), 2) + 1} = aDepth;
     end
 
     function CheckISIN(self, aISIN)
       myTemp = strfind(self.ISINs, aISIN);
-      if any(vertcat(myTemp{:}))
-        self.AddToCellArray(self.ISINs, aISIN);
+      if ~any(vertcat(myTemp{:}))
+        self.ISINs{size(self.ISINs, 2) + 1} = aISIN;
         [self.Assets(:).(aISIN)] = cell(0);
         [self.DepthHistory(:).(aISIN)] = cell(0);
       end
@@ -79,16 +68,36 @@ classdef AssetManager
       % self.CheckISIN(aISIN);
 
       % First we find the index of the trade with the same price.
-      myIndex = find(cellfun(@(trade) abs(trade.price-aP)<0.01, self.Assets.(aISIN)), 1);
+      myIndex = cellfun(@(trade) abs(trade.price-aP)<0.01, self.Assets.(aISIN));
       
-      if any(myIndex(:))
+      if ~any(myIndex(:))
         % If there are no prices, we add a new trade.
-        self.AddToCellArray(self.Assets.(aISIN), self.NewTrade(aP, aV));
+        self.Assets.(aISIN){size(self.Assets.(aISIN), 2) + 1} = self.NewTrade(aP, aV);
       else
         % Otherwise, the volume is updated and the time index
-        % set to CurrentUpdateIndex.
-        self.Assets.(aISIN).volume = self.Assets.(aISIN).volume + aV;
-        self.Assets.(aISIN).index = CurrentUpdateIndex;
+        % set to CurrentUpdateIndex
+        myIndex = find(myIndex, 1);
+        self.Assets.(aISIN){myIndex}.volume = self.Assets.(aISIN){myIndex}.volume + aV;
+        self.Assets.(aISIN){myIndex}.index = self.CurrentUpdateIndex;
+      end
+
+      % Now we update our copy of the book.
+      if aV > 0
+        myPrice = 'askLimitPrice';
+        myVolume = 'askVolume';
+      else
+        myPrice = 'bidLimitPrice';
+        myVolume = 'bidVolume';
+      end
+
+      myIndex = abs(self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myPrice) - aP) < 0.01;
+
+      if abs(aV) < self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume)
+        self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume) = self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume) - abs(aV);
+      else
+        self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume) = self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume)(~myIndex);
+        
+        self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myPrice) = self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myPrice)(~myIndex);
       end
     end
   end
