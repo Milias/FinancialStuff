@@ -1,8 +1,21 @@
 classdef TradingRobot < AutoTrader
   properties
     AssetMgr = AssetManager;
+
     % This struct contains basic parameters of the algorithm.
-    AlgoParams = struct('max_trading_volume', 0, 'lookback', 0, 'trigger_params', struct('tsmax', 0, 'tbmax', 0, 'ssmax', 0.0, 'sbmax', 0.0));
+    % max_trading_volume :    maximum amount of shares to hold at any given tick.
+    % lookback :              number of past ticks to consider for computations.
+    % trigger_params :        several parameters used mainly for triggers.1
+    %   dtsmax :              maximum number of ticks some volume is kept before being sold.
+    %   dtbmax :              number of ticks we wait before buying stock.
+    %   dssmax :              maximum change of the stock's price before selling.
+    %   dsbmax :              change in price before buying.
+    AlgoParams = struct('max_trading_volume', 0, 'lookback', 0, 'trigger_params', struct('dtsmax', 0, 'dtbmax', 0, 'dssmax', 0.0, 'dsbmax', 0.0));
+
+    % Here triggers are stored as functions that only take "self" as an argument.
+    % TriggersData contains information specific to each function, for bookkeeping.
+    Triggers = {};
+    TriggerData = {};
 
     % Placeholder struct to store performance-related stuff.
     PerfMeasure = struct;
@@ -14,12 +27,28 @@ classdef TradingRobot < AutoTrader
       self.AssetMgr.Init({'DBK_EUR', 'CBK_EUR'});
     end
 
+    function InitTriggers(self)
+      % BasicBuyTrig : buy stock when movmean(S, [lookback 0]) > S for dtmax ticks. 
+      % TODO: how much stock?
+      self.Triggers{1} = @BasicBuyTrig;
+      self.TriggersData{1} = struct('tick_count', 0);
+    end
+
     function HandleDepthUpdate(self, ~, aDepth)
       % First the new book is stored.
       self.AssetMgr.UpdateDepths(aDepth);
+    end
 
-      funct = {@Trade};
-      feval(funct{1}, self, 'DBK_EUR', 22, 100);
+    function HandleTriggers(self)
+      for i = size(self.Triggers, 2)
+        self.Triggers{i}(self);
+      end
+    end
+
+    % Buy when movmean(S, [lookback 0]) > S for dtmax ticks.
+    function BasicBuyTrig(self)
+      for aISIN = self.AssetMgr.ISINs
+        myMM = mean(cellfun(@(depth) , self.AssetMgr.DepthHistory.(aISIN)
     end
 
     function [theConfirmation] = Trade(self, aISIN, aP, aV)

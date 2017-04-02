@@ -12,7 +12,8 @@ classdef AssetManager < handle
     ISINs = cell(0);
     
     % Keeping track of how many book updates we've received.
-    CurrentUpdateIndex = 0;
+    % Total,  and one index per ISIN.
+    CurrentIndex = struct('total', 0);
   end
 
   methods
@@ -39,23 +40,40 @@ classdef AssetManager < handle
       theIndices = cellfun(@(trade) trade.price < aP, self.Assets.(aISIN));
     end
 
+    function {theData} = GetDataFromHistory(self, aISIN, aValue, aT)
+      % Returns a cell of vectors containing aValue from the last aT depths from aISIN,
+      % sorted from newest to oldest. NOTE: here aT counts global ticks, not only ticks
+      % counted in self.CurrentIndex.(aISIN).
+
+      theData = cellfun(@(depth) depth.(aValue), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}})
+    end
+
     function theMeanPrice = GetMeanPrice(self, aP, aV)
       theMeanPrice = sum(aP .* aV) / sum(aV);
     end
 
     function theTradeStruct = NewTrade(self, aP, aV)
-      theTradeStruct = struct('price', aP, 'volume', aV, 'index', self.CurrentUpdateIndex);
+      theTradeStruct = struct('price', aP, 'volume', aV, 'index', self.CurrentIndex.total);
     end
 
     function UpdateDepths(self, aDepth)
-      self.CurrentUpdateIndex = self.CurrentUpdateIndex + 1;
-      self.DepthHistory.(aDepth.ISIN){size(self.DepthHistory.(aDepth.ISIN), 2) + 1} = aDepth;
+      % Increasing the amount of book updates we have received.
+      self.CurrentIndex.total = self.CurrentIndex.total + 1;
+      self.CurrentIndex.(aDepth.ISIN) = self.CurrentIndex.(aDepth.ISIN) + 1;
+
+      % Copy depths for each ISIN.
+      for myISIN = self.ISINs
+        self.DepthHistory.(myISIN){end+1} = self.DepthHistory.(myISIN){end};
+      end
+
+      self.DepthHistory.(aDepth.ISIN){end} = aDepth;
     end
 
     function CheckISIN(self, aISIN)
       myTemp = strfind(self.ISINs, aISIN);
       if ~any(vertcat(myTemp{:}))
-        self.ISINs{size(self.ISINs, 2) + 1} = aISIN;
+        self.ISINs{end+1} = aISIN;
+        [self.CurrentIndex(:).(aISIN)] = 0;
         [self.Assets(:).(aISIN)] = cell(0);
         [self.DepthHistory(:).(aISIN)] = cell(0);
       end
@@ -72,13 +90,13 @@ classdef AssetManager < handle
       
       if ~any(myIndex(:))
         % If there are no prices, we add a new trade.
-        self.Assets.(aISIN){size(self.Assets.(aISIN), 2) + 1} = self.NewTrade(aP, aV);
+        self.Assets.(aISIN){end+1} = self.NewTrade(aP, aV);
       else
         % Otherwise, the volume is updated and the time index
-        % set to CurrentUpdateIndex
+        % set to CurrentIndex.total
         myIndex = find(myIndex, 1);
         self.Assets.(aISIN){myIndex}.volume = self.Assets.(aISIN){myIndex}.volume + aV;
-        self.Assets.(aISIN){myIndex}.index = self.CurrentUpdateIndex;
+        self.Assets.(aISIN){myIndex}.index = self.CurrentIndex.total;
       end
 
       % Now we update our copy of the book.
@@ -90,14 +108,13 @@ classdef AssetManager < handle
         myVolume = 'bidVolume';
       end
 
-      myIndex = abs(self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myPrice) - aP) < 0.01;
+      myIndex = abs(self.DepthHistory.(aISIN){end}.(myPrice) - aP) < 0.01;
 
-      if abs(aV) < self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume)
-        self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume) = self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume) - abs(aV);
+      if abs(aV) < self.DepthHistory.(aISIN){end}.(myVolume)(myIndex)
+        self.DepthHistory.(aISIN){end}.(myVolume)(myIndex) = self.DepthHistory.(aISIN){end}.(myVolume)(myIndex) - abs(aV);
       else
-        self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume) = self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myVolume)(~myIndex);
-        
-        self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myPrice) = self.DepthHistory.(aISIN){self.CurrentUpdateIndex}.(myPrice)(~myIndex);
+        self.DepthHistory.(aISIN){end}.(myVolume) = self.DepthHistory.(aISIN){end}.(myVolume)(~myIndex);
+        self.DepthHistory.(aISIN){end}.(myPrice) = self.DepthHistory.(aISIN){end}.(myPrice)(~myIndex);
       end
     end
   end
