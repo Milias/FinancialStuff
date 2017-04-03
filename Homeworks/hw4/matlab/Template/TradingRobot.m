@@ -27,7 +27,7 @@ classdef TradingRobot < AutoTrader
       % Here triggers are stored as functions that only take "self" as an argument.
       % TriggersData contains information specific to each function, for bookkeeping.
       self.Triggers = cell(0);
-      self.TriggersData = cell(0);
+      self.TriggersData = struct;
 
       % Placeholder struct to store performance-related stuff.
       self.PerfMeasure = struct;
@@ -46,14 +46,21 @@ classdef TradingRobot < AutoTrader
     end
 
     function InitTriggers(self)
-      % BasicBuyTrig : buy stock when movmean(S, [lookback 0]) > S for dtmax ticks. 
+      % == BasicBuyTrig ==
+      % Buy stock when movmean(S, [lookback 0]) > S for dtmax ticks. 
       % TODO: how much stock? For now just the first entry.
       self.Triggers{1} = @BasicBuyTrig;
-      self.TriggersData{1} = struct('tick_count', 0);
+      self.TriggersData.BasicBuyTrig = struct('tick_count', 0);
 
-      % BasicSellTrig
+      % == BasicSellTrig ==
+      % A large position in the market (either positive or negative) should reduce
+      % the holding time significantly, so that small volumes can be kept around
+      % for longer than V > max_trading_volume.
+      % Selling after a certain amount of time is difficult to track, so instead
+      % we'll sell after N ticks holding a significant position.
+      % TODO: improve this ^ function.
       self.Triggers{2} = @BasicSellTrig;
-      self.TriggersData{2} = struct;
+      self.TriggersData.BasicSellTrig = struct('tick_count', 0);
     end
 
     function HandleDepthUpdate(self, ~, aDepth)
@@ -65,14 +72,14 @@ classdef TradingRobot < AutoTrader
     end
 
     function HandleTriggers(self)
-      for i = 1:size(self.Triggers, 2)
+      for i = 1:length(self.Triggers)
         self.Triggers{i}(self);
       end
     end
 
     % Buy when movmean(S_ask, [lookback 0]) < S_bid for dtbmax ticks.
     function BasicBuyTrig(self)
-      for i = 1:size(self.AssetMgr.ISINs, 2)
+      for i = 1:length(self.AssetMgr.ISINs)
         myISIN = self.AssetMgr.ISINs{i};
 
         % Get data from the last `lookback` depths.
@@ -81,17 +88,17 @@ classdef TradingRobot < AutoTrader
         % Compute the mean weighted with volumes of the ask prices.
         myAskMean = sum(cellfun(@(p, v) sum(p .* v), myData.askLimitPrice, myData.askVolume)) / sum(cell2mat(myData.askVolume'));
 
-        if size(myData.askLimitPrice{end}, 1) && size(myData.bidLimitPrice{end}, 1)
-          fprintf('a: %2.2f, b: %2.2f\n', myAskMean, myData.bidLimitPrice{end}(1));
+        if length(myData.askLimitPrice{end}) && length(myData.bidLimitPrice{end})
+          % fprintf('a: %2.2f, b: %2.2f\n', myAskMean, myData.bidLimitPrice{end}(1));
           if myAskMean < myData.bidLimitPrice{end}(1)
-            self.TriggersData{1}.tick_count = self.TriggersData{1}.tick_count + 1;
+            self.TriggersData.BasicBuyTrig.tick_count = self.TriggersData.BasicBuyTrig.tick_count + 1;
           end
 
-          if self.TriggersData{1}.tick_count == self.AlgoParams.trigger_params.dtbmax
-            self.TriggersData{1}.tick_count = 0;
+          if self.TriggersData.BasicBuyTrig.tick_count == self.AlgoParams.trigger_params.dtbmax
+            self.TriggersData.BasicBuyTrig.tick_count = 0;
             myVol = self.AlgoParams.max_trading_volume - self.AssetMgr.GetISINVolume(myISIN, 1)
             if myVol > 0
-              fprintf('BasicBuyTrig - \n');
+              fprintf('BasicBuyTrig\n');
               self.Trade(myISIN, myData.askLimitPrice{end}(1), myData.askVolume{end}(1));
             end
           end
@@ -102,18 +109,17 @@ classdef TradingRobot < AutoTrader
     % Basic selling trigger: sell after dthmax ticks or if the price decreases
     % for more than dtsmax ticks.
     function BasicSellTrig(self)
-      for myISIN = self.AssetMgr.ISINs
-        myISIN = myISIN{1};
-        for myTrade = self.AssetMgr.Assets.(myISIN)
-          myTrade = myTrade{1};
-          if myTrade.volume < 0
-            continue
-          end
-          if self.AssetMgr.CurrentIndex.total - myTrade.index > self.AlgoParams.trigger_params.dthmax
-            fprintf('BasicSellTrig - \n');
-            self.TradeFullStock(myISIN, -myTrade.volume);
-          end
-        end
+      % Count for how many ticks our position has been higher than max_trading_volume.
+      if abs(self.AssetMgr.GetTotalVolume()) > self.AlgoParams.max_trading_volume
+        self.TriggersData.BasicSellTrig.tick_count = self.TriggersData.BasicSellTrig.tick_count + 1;
+      end
+            
+      if self.TriggersData.BasicSellTrig.tick_count == self.AlgoParams.trigger_params.dthmax
+        % Get positive position and try to sell that.
+        cellfun(@(isin) self.TradeFullStock(isin, -self.AssetMgr.GetISINVolume(isin, 1)), self.AssetMgr.ISINs)
+
+        % Same with negative position. 
+        cellfun(@(isin) self.TradeFullStock(isin, -self.AssetMgr.GetISINVolume(isin, -1)), self.AssetMgr.ISINs)
       end
     end 
 
@@ -127,38 +133,52 @@ classdef TradingRobot < AutoTrader
     function [theConfirmation] = Trade(self, aISIN, aP, aV)
       % Helper function for buying (aV > 0) and selling (aV < 0) stock.
       % Returns whether the order was successful or not.
-      myCurrentTrades = size(self.ownTrades.price, 1);
+      myCurrentTrades = length(self.ownTrades.price);
       self.SendNewOrder(aP, abs(aV), sign(aV), {aISIN}, {'IMMEDIATE'}, 0);
-      myTradeCount = size(self.ownTrades.price, 1) - myCurrentTrades;
+      myTradeCount = length(self.ownTrades.price) - myCurrentTrades;
       theConfirmation = myTradeCount > 0;
- 
-      if theConfirmation
-        % Here we iterate over all the trades done (in case aV > first entry's volume),
-        % updating our assets and book.
-        for i = 1:myTradeCount
-          fprintf('Trade: %7s, %3.2f, %3.0f\n', aISIN, self.ownTrades.price(myCurrentTrades+i), sign(aV) * self.ownTrades.volume(myCurrentTrades+i));
-
+       
+      fprintf('Trade info: %7s, %3.2f, %3.0f\n', aISIN, aP, aV);
+      % Here we iterate over all the trades done (in case aV > first entry's volume),
+      % updating our assets and book.
+      for i = 1:myTradeCount
+        fprintf('Trade: %3.2f, %3.0f - ', self.ownTrades.price(myCurrentTrades+i), sign(aV) * self.ownTrades.volume(myCurrentTrades+i));
+        if theConfirmation
+          fprintf('Correct.\n');
           self.AssetMgr.UpdateAssets(aISIN, self.ownTrades.price(myCurrentTrades+i), sign(aV) * self.ownTrades.volume(myCurrentTrades+i));
+        else
+          fprintf('Rejected.\n');
         end
       end
     end
 
     function TradeFullStock(self, aISIN, aV)
       % Try to buy/sell the volume aV.
-      if aV < 0
+      if aV > 0
         myLabels = {'askLimitPrice', 'askVolume'};
       else
         myLabels = {'bidLimitPrice', 'bidVolume'};
       end
 
+
       myData = self.AssetMgr.GetDataFromHistory(aISIN, myLabels, 0);
-      size(myData.(myLabels{1}))
-      if size(myData.(myLabels{1}), 2) > 0 && size(myData.(myLabels{2}), 2) > 0
-        disp(myData.(myLabels{1}){end})
+      %{
+      % This is not working, for now we'll trade only with the first entry.
+
+      if size(myData.(myLabels{1}){end}, 2) > 0 && size(myData.(myLabels{2}){end}, 2) > 0
+        disp('aV - cumsum')
+        disp(abs(aV) - [ 0 ; cumsum(myData.(myLabels{2}){end}(1:end-1))])
+        disp('volume')
         disp(myData.(myLabels{2}){end})
-        myVol = abs(aV) - [ 0 ; cumsum(myData.(myLabels{2}){1}) ]
-        myIndex = myVol > 0
-        arrayfun(@(p, v) self.Trade(aISIN, p, sign(aV)*v), myData.(myLabels{1}){1}(myIndex(1:end-1)), sign(aV) * myVol(myIndex(1:end-1)));
+        myVol = min(abs(aV) - [ 0 ; cumsum(myData.(myLabels{2}){end}(1:end-1))], myData.(myLabels{2}){end})
+        myIndex = myVol > 0;
+        arrayfun(@(p, v) self.Trade(aISIN, p, sign(aV)*v), myData.(myLabels{1}){end}(myIndex), -myVol(myIndex));
+      end
+      %}
+
+      if length(myData.(myLabels{1}){end}) > 0 && length(myData.(myLabels{2}){end}) > 0
+        fprintf('TradeFullStock - \n');
+        self.Trade(aISIN, myData.(myLabels{1}){end}(1), sign(aV) * min(myData.(myLabels{2}){end}(1), abs(aV)));
       end
     end
 

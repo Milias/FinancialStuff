@@ -29,7 +29,7 @@ classdef AssetManager < handle
         aISINs = {};
       end
 
-      for i = 1:size(aISINs, 2)
+      for i = 1:length(aISINs)
         self.CheckISIN(aISINs{i})
       end
     end
@@ -56,21 +56,26 @@ classdef AssetManager < handle
     end
 
     function theVolume = GetTotalVolume(self, aSide)
-      theVolume = sum(cellfun(@(isin) sum(cellfun(@(trade) trade.volume * (sign(trade.volume) == aSide), self.Assets.(isin))), self.ISINs));
+      if argin == 1
+        theVolume = sum(cellfun(@(isin) sum(cellfun(@(trade) trade.volume * (sign(trade.volume) == aSide), self.Assets.(isin))), self.ISINs));
+      else
+        % This is the current position in the market.
+        theVolume = sum(cellfun(@(isin) sum(cellfun(@(trade) trade.volume, self.Assets.(isin))), self.ISINs));
+      end
     end
 
     function theIndices = GetIndicesLowerThan(self, aISIN, aP)
       theIndices = cellfun(@(trade) trade.price < aP, self.Assets.(aISIN));
     end
 
-    function theData = GetDataFromHistory(self, aISIN, aValue, aT)
+    function theData = GetDataFromHistory(self, aISIN, aValue, aT, aSide)
       % Returns a cell of vectors containing aValue from the last aT depths from aISIN,
       % sorted from newest to oldest. NOTE: here aT counts global ticks, not only ticks
       % counted in self.CurrentIndex.(aISIN).
-      
       theData = struct;
-      for v = 1:size(aValue, 2)
-        [theData(:).(aValue{v})] = cellfun(@(depth) depth.(aValue{v}), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}}, 'UniformOutput', false);
+      for myVal = aValue
+        myVal = myVal{1};
+        [theData(:).(myVal)] = cellfun(@(depth) depth.(myVal), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}}, 'UniformOutput', false);
       end
     end
 
@@ -88,15 +93,16 @@ classdef AssetManager < handle
       self.CurrentIndex.(aDepth.ISIN) = self.CurrentIndex.(aDepth.ISIN) + 1;
 
       % Copy depths for each ISIN.
-      for i = 1:size(self.ISINs, 2)
-        if size(self.DepthHistory.(self.ISINs{i}), 2)
-          self.DepthHistory.(self.ISINs{i}){end+1} = self.DepthHistory.(self.ISINs{i}){end};
+      for myISIN = self.ISINs
+        myISIN = myISIN{1}; 
+        if length(self.DepthHistory.(myISIN))
+          self.DepthHistory.(myISIN){end+1} = self.DepthHistory.(myISIN){end};
         else
-          self.DepthHistory.(self.ISINs{i}){1} = struct('ISIN', self.ISINs{i}, 'ticksize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
+          self.DepthHistory.(myISIN){1} = struct('ISIN', myISIN, 'ticksize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
         end
       end
 
-      if size(self.DepthHistory.(aDepth.ISIN), 2)
+      if length(self.DepthHistory.(aDepth.ISIN))
         self.DepthHistory.(aDepth.ISIN){end} = aDepth;
       else 
         self.DepthHistory.(aDepth.ISIN){1} = aDepth;
@@ -124,7 +130,7 @@ classdef AssetManager < handle
       
       if ~any(myIndex(:))
         % If there are no prices, we add a new trade.
-        self.Assets.(aISIN){size(self.Assets.(aISIN), 2) + 1} = self.NewTrade(aP, aV);
+        self.Assets.(aISIN){length(self.Assets.(aISIN)) + 1} = self.NewTrade(aP, aV);
       else
         % Otherwise, the volume is updated and the time index
         % set to CurrentIndex.total
@@ -132,6 +138,8 @@ classdef AssetManager < handle
         self.Assets.(aISIN){myIndex}.volume = self.Assets.(aISIN){myIndex}.volume + aV;
         self.Assets.(aISIN){myIndex}.index = self.CurrentIndex.total;
       end
+
+      disp(self.Assets.(aISIN))
 
       % Now we update our copy of the book.
       if aV > 0
