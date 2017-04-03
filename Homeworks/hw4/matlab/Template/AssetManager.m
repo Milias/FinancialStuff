@@ -1,24 +1,31 @@
 classdef AssetManager < handle
   properties
-    % Struct where we store the price and volume of our assets.
-    % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0, 'index', 0)}.
-    Assets = struct;
-      
-    % Struct of vectors containing depths for each ISIN.
-    % Structure: self.DepthHistory.ISIN = {}.
-    DepthHistory = struct;
-      
-    % Vector of stored ISINs.
-    ISINs = cell(0);
-    
-    % Keeping track of how many book updates we've received.
-    % Total,  and one index per ISIN.
-    CurrentIndex = struct('total', 0);
+    Assets
+    DepthHistory
+    ISINs
+    CurrentIndex
   end
 
   methods
+    function self = AssetManager 
+      % Struct where we store the price and volume of our assets.
+      % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0, 'index', 0)}.
+      self.Assets = struct;
+      
+      % Struct of vectors containing depths for each ISIN.
+      % Structure: self.DepthHistory.ISIN = {}.
+      self.DepthHistory = struct;
+      
+      % Vector of stored ISINs.
+      self.ISINs = cell(0);
+    
+      % Keeping track of how many book updates we've received.
+      % Total,  and one index per ISIN.
+      self.CurrentIndex = struct('total', 0);
+    end
+
     function Init(self, aISINs)
-      if nargin == 0
+      if nargin == 1
         aISINs = {};
       end
 
@@ -27,8 +34,16 @@ classdef AssetManager < handle
       end
     end
 
-    function theVolume = GetCurrentVolume(self, aISIN, aP)
-      myIndex = find(cellfun(@(trade) abs(trade.price-aP)<0.01, self.Assets.(aISIN)), 1);
+    function delete(self)
+      % Destructor.
+      clear self.Assets;
+      clear self.DepthHistory;
+      clear self.ISINs;
+      clear self.CurrentIndex;
+    end
+
+    function theVolume = GetVolume(self, aISIN, aP)
+      myIndex = find(cellfun(@(trade) abs(trade.price-aP)<0.001, self.Assets.(aISIN)), 1);
       if any(myIndex(:))
         theVolume = self.Assets.(aISIN).volume(myIndex);
       else
@@ -36,16 +51,27 @@ classdef AssetManager < handle
       end
     end
 
+    function theVolume = GetISINVolume(self, aISIN, aSide)
+      theVolume = sum(cellfun(@(trade) trade.volume * (sign(trade.volume) == aSide), self.Assets.(aISIN)));
+    end
+
+    function theVolume = GetTotalVolume(self, aSide)
+      theVolume = sum(cellfun(@(isin) sum(cellfun(@(trade) trade.volume * (sign(trade.volume) == aSide), self.Assets.(isin))), self.ISINs));
+    end
+
     function theIndices = GetIndicesLowerThan(self, aISIN, aP)
       theIndices = cellfun(@(trade) trade.price < aP, self.Assets.(aISIN));
     end
 
-    function {theData} = GetDataFromHistory(self, aISIN, aValue, aT)
+    function theData = GetDataFromHistory(self, aISIN, aValue, aT)
       % Returns a cell of vectors containing aValue from the last aT depths from aISIN,
       % sorted from newest to oldest. NOTE: here aT counts global ticks, not only ticks
       % counted in self.CurrentIndex.(aISIN).
-
-      theData = cellfun(@(depth) depth.(aValue), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}})
+      
+      theData = struct;
+      for v = 1:size(aValue, 2)
+        [theData(:).(aValue{v})] = cellfun(@(depth) depth.(aValue{v}), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}}, 'UniformOutput', false);
+      end
     end
 
     function theMeanPrice = GetMeanPrice(self, aP, aV)
@@ -62,11 +88,19 @@ classdef AssetManager < handle
       self.CurrentIndex.(aDepth.ISIN) = self.CurrentIndex.(aDepth.ISIN) + 1;
 
       % Copy depths for each ISIN.
-      for myISIN = self.ISINs
-        self.DepthHistory.(myISIN){end+1} = self.DepthHistory.(myISIN){end};
+      for i = 1:size(self.ISINs, 2)
+        if size(self.DepthHistory.(self.ISINs{i}), 2)
+          self.DepthHistory.(self.ISINs{i}){end+1} = self.DepthHistory.(self.ISINs{i}){end};
+        else
+          self.DepthHistory.(self.ISINs{i}){1} = struct('ISIN', self.ISINs{i}, 'ticksize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
+        end
       end
 
-      self.DepthHistory.(aDepth.ISIN){end} = aDepth;
+      if size(self.DepthHistory.(aDepth.ISIN), 2)
+        self.DepthHistory.(aDepth.ISIN){end} = aDepth;
+      else 
+        self.DepthHistory.(aDepth.ISIN){1} = aDepth;
+      end
     end
 
     function CheckISIN(self, aISIN)
@@ -86,11 +120,11 @@ classdef AssetManager < handle
       % self.CheckISIN(aISIN);
 
       % First we find the index of the trade with the same price.
-      myIndex = cellfun(@(trade) abs(trade.price-aP)<0.01, self.Assets.(aISIN));
+      myIndex = cellfun(@(trade) abs(trade.price-aP)<0.001, self.Assets.(aISIN));
       
       if ~any(myIndex(:))
         % If there are no prices, we add a new trade.
-        self.Assets.(aISIN){end+1} = self.NewTrade(aP, aV);
+        self.Assets.(aISIN){size(self.Assets.(aISIN), 2) + 1} = self.NewTrade(aP, aV);
       else
         % Otherwise, the volume is updated and the time index
         % set to CurrentIndex.total
