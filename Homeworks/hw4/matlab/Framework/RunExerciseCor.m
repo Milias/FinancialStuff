@@ -10,12 +10,13 @@ myFeedPublisher = FeedPublisher();
 myExchange.RegisterAutoTrader(myFeedPublisher);
 myFeedPublisher.StartAutoTrader(myExchange);
 
+%myTradingRobot = PlotFeedRobot(); 
 myTradingRobot = TradingRobot();
 myExchange.RegisterAutoTrader(myTradingRobot);
 myTradingRobot.StartAutoTrader(myExchange);
 
-myFeedPublisher.StartVeryShortFeed(myFeed);
+myFeedPublisher.StartFeed(myFeed);
 
 myTradingRobot.Unwind();
-%ReportFeed(myTradingRobot);
+%ReportFeedHist(myTradingRobot);
 Report(myTradingRobot.ownTrades);

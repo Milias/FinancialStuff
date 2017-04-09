@@ -4,13 +4,20 @@ classdef AssetManager < handle
     DepthHistory
     ISINs
     CurrentIndex
+
+    ActiveTrades
+    CompletedTrades
   end
 
   methods
     function self = AssetManager 
       % Struct where we store the price and volume of our assets.
-      % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0, 'index', 0)}.
+      % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0)}.
       self.Assets = struct;
+
+      % Struct where trades are stored.
+      self.ActiveTrades = struct;
+      self.CompletedTrades = struct;
       
       % Struct of vectors containing depths for each ISIN.
       % Structure: self.DepthHistory.ISIN = {}.
@@ -42,49 +49,45 @@ classdef AssetManager < handle
       clear self.CurrentIndex;
     end
 
-    function theVolume = GetVolume(self, aISIN, aP)
-      myIndex = find(cellfun(@(trade) abs(trade.price-aP)<0.001, self.Assets.(aISIN)), 1);
-      if any(myIndex(:))
-        theVolume = self.Assets.(aISIN).volume(myIndex);
-      else
-        theVolume = 0;
-      end
+    function theVolume = GetISINPosition(self, aISIN)
+      theVolume = sum(cellfun(@(asset) asset.volume, self.Assets.(aISIN)));
     end
 
-    function theVolume = GetISINVolume(self, aISIN, aSide)
-      theVolume = sum(cellfun(@(trade) trade.volume * (sign(trade.volume) == aSide), self.Assets.(aISIN)));
+    function theVolume = GetTotalPosition(self)
+      theVolume = sum(cellfun(@(isin) sum(cellfun(@(asset) asset.volume, self.Assets.(isin))), self.ISINs));
     end
 
-    function theVolume = GetTotalVolume(self, aSide)
-      if argin == 1
-        theVolume = sum(cellfun(@(isin) sum(cellfun(@(trade) trade.volume * (sign(trade.volume) == aSide), self.Assets.(isin))), self.ISINs));
-      else
-        % This is the current position in the market.
-        theVolume = sum(cellfun(@(isin) sum(cellfun(@(trade) trade.volume, self.Assets.(isin))), self.ISINs));
-      end
-    end
-
-    function theIndices = GetIndicesLowerThan(self, aISIN, aP)
-      theIndices = cellfun(@(trade) trade.price < aP, self.Assets.(aISIN));
-    end
-
-    function theData = GetDataFromHistory(self, aISIN, aValue, aT, aSide)
+    function theData = GetDataFromHistory(self, aISIN, aValues, aT)
       % Returns a cell of vectors containing aValue from the last aT depths from aISIN,
       % sorted from newest to oldest. NOTE: here aT counts global ticks, not only ticks
       % counted in self.CurrentIndex.(aISIN).
       theData = struct;
-      for myVal = aValue
+      
+      for myVal = aValues
         myVal = myVal{1};
         [theData(:).(myVal)] = cellfun(@(depth) depth.(myVal), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}}, 'UniformOutput', false);
       end
     end
 
-    function theMeanPrice = GetMeanPrice(self, aP, aV)
-      theMeanPrice = sum(aP .* aV) / sum(aV);
+    function theData = ComputeDataFromHistory(self, aISIN, aValues, aT, aFunc)
+      % Computes values using the history.
+      theData = self.GetDataFromHistory(aISIN, aValues, aT);
+
+      for i = 1:length(aValues)
+        theData.(aValues{i}) = { cellfun(@(x) aFunc{i}(x), theData.(aValues{i})) };
+      end
     end
 
-    function theTradeStruct = NewTrade(self, aP, aV)
-      theTradeStruct = struct('price', aP, 'volume', aV, 'index', self.CurrentIndex.total);
+    function theProfit = GetTotalProfit(self)
+      theProfit = -sum(cellfun(@(isin) sum(cellfun(@(asset) asset.price .* asset.volume, self.Assets.(isin))), self.ISINs));
+    end
+
+    function theProfit = GetISINProfit(self, aISIN)
+      theProfit = -sum(cellfun(@(asset) asset.price .* asset.volume, self.Assets.(aISIN))); 
+    end
+
+    function theProfit = GetComplProfit(self, aISIN)
+      theProfit = sum(cellfun(@(trade) sum(trade.price), self.CompletedTrades.(aISIN)));
     end
 
     function UpdateDepths(self, aDepth)
@@ -116,30 +119,38 @@ classdef AssetManager < handle
         [self.CurrentIndex(:).(aISIN)] = 0;
         [self.Assets(:).(aISIN)] = cell(0);
         [self.DepthHistory(:).(aISIN)] = cell(0);
+        [self.ActiveTrades(:).(aISIN)] = cell(0);
+        [self.CompletedTrades(:).(aISIN)] = cell(0);
+      end
+    end
+
+    function GenerateNewTrade(self, aISIN, aP, aV)
+      self.ActiveTrades.(aISIN){length(self.ActiveTrades.(aISIN)) + 1} = struct('price', [aP], 'volume', [aV], 'time', [self.CurrentIndex.total]);
+      fprintf('Trade %d (%7s) added.\n', length(self.ActiveTrades.(aISIN)), aISIN)
+    end
+
+    function ArchiveCompletedTrades(self)
+      for isin = self.ISINs
+        isin = isin{1};
+
+        % Indices of trades with volume zero.
+        myIdx = cellfun(@(trade) abs(sum(trade.volume)) < 0.01, self.ActiveTrades.(isin));
+
+        % Updates the CompletedTrades cell array with the new elements from ActiveTrades.
+        self.CompletedTrades.(isin)(length(self.CompletedTrades.(isin))+1:length(self.CompletedTrades.(isin))+nnz(myIdx)) = self.ActiveTrades.(isin)(myIdx);
+
+        % Removes completed trades from ActiveTrades.
+        self.ActiveTrades.(isin) = self.ActiveTrades.(isin)(~myIdx);
       end
     end
 
     function UpdateAssets(self, aISIN, aP, aV)
-      % Checking that aISIN is in our assets.
-      % In this case we don't need it, since we already know the ISINs from the
-      % beginning.
-      % self.CheckISIN(aISIN);
+      self.Assets.(aISIN){length(self.Assets.(aISIN)) + 1} = struct('price', aP, 'volume', aV);
 
-      % First we find the index of the trade with the same price.
-      myIndex = cellfun(@(trade) abs(trade.price-aP)<0.001, self.Assets.(aISIN));
-      
-      if ~any(myIndex(:))
-        % If there are no prices, we add a new trade.
-        self.Assets.(aISIN){length(self.Assets.(aISIN)) + 1} = self.NewTrade(aP, aV);
-      else
-        % Otherwise, the volume is updated and the time index
-        % set to CurrentIndex.total
-        myIndex = find(myIndex, 1);
-        self.Assets.(aISIN){myIndex}.volume = self.Assets.(aISIN){myIndex}.volume + aV;
-        self.Assets.(aISIN){myIndex}.index = self.CurrentIndex.total;
+      for isin = self.ISINs
+        isin = isin{1};
+        fprintf('ISIN: %7s, position: %3.0f\n', isin, self.GetISINPosition(isin))
       end
-
-      disp(self.Assets.(aISIN))
 
       % Now we update our copy of the book.
       if aV > 0

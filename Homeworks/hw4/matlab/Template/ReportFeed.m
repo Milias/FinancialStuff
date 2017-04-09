@@ -1,25 +1,25 @@
 function ReportFeed(aFeedRobot)
-  myIsinLabels = unique(arrayfun(@(aDepth) aDepth.ISIN, aFeedRobot.DepthHistory, 'UniformOutput', false));
+  myIsinLabels = unique(cellfun(@(aDepth) aDepth.ISIN, aFeedRobot.DepthHistory, 'UniformOutput', false));
 
-  myX = 1:size(aFeedRobot.DepthHistory, 2);
+  myX = 1:length(aFeedRobot.DepthHistory);
 
-  myIsins = arrayfun(@(x) x.ISIN, aFeedRobot.DepthHistory, 'UniformOutput', false);
-  myIndex = arrayfun(@(x) strcmp(myIsins, x), myIsinLabels, 'UniformOutput', false);
+  myIsins = cellfun(@(x) x.ISIN, aFeedRobot.DepthHistory, 'UniformOutput', false);
+  myIndex = cellfun(@(x) strcmp(myIsins, x), myIsinLabels, 'UniformOutput', false);
 
   % In first instance we plot the weighted average of both ask and bid entries.
-  myValues = arrayfun(@(aDepth) sum([ aDepth.askLimitPrice .* aDepth.askVolume ; aDepth.bidLimitPrice .* aDepth.bidVolume ]) / (sum(aDepth.askVolume) + sum(aDepth.bidVolume)), aFeedRobot.DepthHistory);
+  myValues = cellfun(@(aDepth) sum([ aDepth.askLimitPrice .* aDepth.askVolume ; aDepth.bidLimitPrice .* aDepth.bidVolume ]) / (sum(aDepth.askVolume) + sum(aDepth.bidVolume)), aFeedRobot.DepthHistory);
 
   % Remove NaN (no entries in the book)
   myNotNaN = ~isnan(myValues);
   myX = myX(myNotNaN);
   myValues = myValues(myNotNaN);
-  for i=1:size(myIsinLabels, 2)
+  for i=1:length(myIsinLabels)
     localIndex = cell2mat(myIndex(i));
     localIndex = localIndex(myNotNaN);
     myIndex(i) = {localIndex};
   end
 
-  for i=1:size(myIsinLabels, 2)
+  for i=1:length(myIsinLabels)
     myIndexLogical = cell2mat(myIndex(i));
     localX = myX(myIndexLogical);
     localY1 = myValues(myIndexLogical);
