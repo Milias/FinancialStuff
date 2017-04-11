@@ -47,6 +47,9 @@ classdef AssetManager < handle
       clear self.DepthHistory;
       clear self.ISINs;
       clear self.CurrentIndex;
+
+      clear self.ActiveTrades;
+      clear self.CompletedTrades;
     end
 
     function theVolume = GetISINPosition(self, aISIN)

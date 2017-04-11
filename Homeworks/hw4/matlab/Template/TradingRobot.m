@@ -24,7 +24,7 @@ classdef TradingRobot < AutoTrader
       %   dsbmax :              change in price before buying.
       self.AlgoParams = struct('max_trading_volume', struct, 'lookback', 100, 'trigger_params', struct('dtsmax', 30, 'dtbmax', 30, 'dthmax', 10, 'dssmax', 0.0, 'dsbmax', 0.0));
 
-      self.AlgoParams.max_trading_volume.DBK_EUR = 2;
+      self.AlgoParams.max_trading_volume.DBK_EUR = 10;
       self.AlgoParams.max_trading_volume.CBK_EUR = 10;
 
       % Here triggers are stored as functions that only take "self" as an argument.
@@ -52,20 +52,25 @@ classdef TradingRobot < AutoTrader
 
     function InitTriggers(self)
       % == TrendTradeTrig ==
-      % Buy stock when movmean(S, [lookback 0]) > S for dtmax ticks. 
-      % TODO: how much stock? For now just the first entry.
-      self.Triggers{1} = 'TrendTradeTrig';
+      % Trade when the trend changes.
+      self.Triggers{end + 1} = 'TrendTradeTrig';
       self.TriggersData.TrendTradeTrig = struct('tick_count_buy', 0, 'tick_count_sell', 0);
 
       % == ReducePositionTrig ==
-      % A large position in the market (either positive or negative) should reduce
-      % the holding time significantly, so that small volumes can be kept around
-      % for longer than V < max_trading_volume.
-      % Selling after a certain amount of time is difficult to track, so instead
-      % we'll sell after N ticks holding a significant position.
-      % TODO: improve this ^ function.
-      self.Triggers{2} = 'TradeMatchTrig';
+      %self.Triggers{end + 1} = 'TradeMatchTrig';
       self.TriggersData.TradeMatchTrig = struct('tick_count', 0);
+
+      % == Detect Trends ==
+      % Double exponential smoothing for now.
+      % TODO: forecasting and back fitting?
+      % https://grisha.org/blog/2016/01/29/triple-exponential-smoothing-forecasting/
+      self.Triggers{end + 1} = 'TrendDetectionTrig';
+      self.TriggersData.TrendDetectionTrig = struct;
+
+      for isin = self.AssetMgr.ISINs
+        isin = isin{1};
+        [self.TriggersData.TrendDetectionTrig(:).(isin)] = struct('c_ask', [0.05, 0.08, 0.12], 'l_ask', [], 'b_ask', [], 'b2_ask', [], 'c_bid', [0.05, 0.08, 0.12], 'l_bid', [], 'b_bid', [], 'b2_bid', []);
+      end
     end
 
     function HandleDepthUpdate(self, ~, aDepth)
@@ -78,6 +83,7 @@ classdef TradingRobot < AutoTrader
 
     function HandleTriggers(self)
       for trig = self.Triggers
+        % fprintf('Trig: %s\n', trig{1})
         self.(trig{1})();
       end
     end
@@ -87,51 +93,38 @@ classdef TradingRobot < AutoTrader
       for isin = self.AssetMgr.ISINs
         isin = isin{1};
 
-        % Get data from the last `lookback` depths.
-        myData = self.AssetMgr.GetDataFromHistory(isin, {'askLimitPrice', 'askVolume', 'bidLimitPrice', 'bidVolume'}, self.AlgoParams.lookback);
+        myData = self.AssetMgr.GetDataFromHistory(isin, {'askLimitPrice', 'askVolume', 'bidLimitPrice', 'bidVolume'}, 1);
 
-        % Compute the mean weighted with volumes of the ask prices
-        % myAskMean = mean(cellfun(@(p, v) self.GetVolumePrice(p, v, self.AlgoParams.max_trading_volume.(isin)), myData.askLimitPrice, myData.askVolume));
-        % myBidMean = mean(cellfun(@(p, v) self.GetVolumePrice(p, v, self.AlgoParams.max_trading_volume.(isin)), myData.bidLimitPrice, myData.bidVolume));
+        if ~any(cellfun(@isempty, myData.askLimitPrice)) && ~any(cellfun(@isempty, myData.bidLimitPrice))
+          if length(self.TriggersData.TrendDetectionTrig.(isin).b2_ask) > 1 
+            if self.TriggersData.TrendDetectionTrig.(isin).b_ask(end) < 0 && self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end)*self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end-1) < 0
+              
+              self.TriggersData.TrendTradeTrig.tick_count_buy = 0;
 
-        % myAskMean = sum(cellfun(@(p, v) sum(p .* v), myData.askLimitPrice, myData.askVolume)) / sum(cell2mat(myData.askVolume'));
-        % myBidMean = sum(cellfun(@(p, v) sum(p .* v), myData.bidLimitPrice, myData.bidVolume)) / sum(cell2mat(myData.bidVolume'));
-
-        myAskMean = mean(cellfun(@(p) p(1), myData.askLimitPrice(logical(cellfun(@length, myData.askLimitPrice)))));
-        myBidMean = mean(cellfun(@(p) p(1), myData.bidLimitPrice(logical(cellfun(@length, myData.bidLimitPrice)))));
-
-        if length(myData.askLimitPrice{1}) && length(myData.bidLimitPrice{1})
-          fprintf('am: %2.2f, cb: %2.2f\n', myAskMean, myData.bidLimitPrice{1}(1));
-          fprintf('bm: %2.2f, ca: %2.2f\n\n', myBidMean, myData.askLimitPrice{1}(1));
-          if myAskMean < myData.bidLimitPrice{1}(1)
-            self.TriggersData.TrendTradeTrig.tick_count_buy = self.TriggersData.TrendTradeTrig.tick_count_buy + 1;
-          end
-
-          if myBidMean > myData.askLimitPrice{1}(1)
-            self.TriggersData.TrendTradeTrig.tick_count_sell = self.TriggersData.TrendTradeTrig.tick_count_sell + 1;
-          end
-
-          if self.TriggersData.TrendTradeTrig.tick_count_buy == self.AlgoParams.trigger_params.dtbmax
-            self.TriggersData.TrendTradeTrig.tick_count_buy = 0;
-            myPos = self.AssetMgr.GetISINPosition(isin);
-            myVol = min(max(0, self.AlgoParams.max_trading_volume.(isin) - abs(myPos)), myData.askVolume{1}(1));
-            if myVol > 0
-              fprintf('\nTrendTradeTrig - Buy\n');
-              if self.Trade(isin, myData.askLimitPrice{1}(1), myVol) > 0
-                self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+              myPos = self.AssetMgr.GetISINPosition(isin);
+              myVol = min(max(0, self.AlgoParams.max_trading_volume.(isin) - myPos), myData.askVolume{1}(1));
+              
+              if myVol > 0
+                fprintf('\nTrendTradeTrig - Buy\n');
+                if self.Trade(isin, myData.askLimitPrice{1}(1), myVol) > 0
+                  %self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+                end
               end
             end
           end
- 
-          if self.TriggersData.TrendTradeTrig.tick_count_sell == self.AlgoParams.trigger_params.dtsmax
-            self.TriggersData.TrendTradeTrig.tick_count_sell = 0;
-            myPosition = self.AssetMgr.GetISINPosition(isin);
-            myVol = min(max(0, self.AlgoParams.max_trading_volume.(isin) - abs(myPos)), myData.bidVolume{1}(1));
+
+          if length(self.TriggersData.TrendDetectionTrig.(isin).b2_bid) > 1
+            if self.TriggersData.TrendDetectionTrig.(isin).b_bid(end) > 0 && self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end)*self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end-1) < 0
+              self.TriggersData.TrendTradeTrig.tick_count_sell = 0;
+
+              myPos = self.AssetMgr.GetISINPosition(isin);
+              myVol = min(max(0, self.AlgoParams.max_trading_volume.(isin) + myPos), myData.bidVolume{1}(1));
             
-            if myVol > 0
-              fprintf('\nTrendTradeTrig - Sell\n');
-              if self.Trade(isin, myData.bidLimitPrice{1}(1), -myVol) > 0
-                self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+              if myVol > 0
+                fprintf('\nTrendTradeTrig - Sell\n');
+                if self.Trade(isin, myData.bidLimitPrice{1}(1), -myVol) > 0
+                  %self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+                end
               end
             end
           end
@@ -176,7 +169,71 @@ classdef TradingRobot < AutoTrader
       % fprintf('After. Active: %d, Completed: %d\n', sum(cellfun(@(isin) length(self.AssetMgr.ActiveTrades.(isin)), self.AssetMgr.ISINs)), sum(cellfun(@(isin) length(self.AssetMgr.CompletedTrades.(isin)), self.AssetMgr.ISINs)))
     end 
 
-    function thePrice = GetVolumePrice(self, aP, aV, aLimitVol)
+    function TrendDetectionTrig(self)
+      for isin = self.AssetMgr.ISINs
+        isin = isin{1};
+
+        alpha_ask = self.TriggersData.TrendDetectionTrig.(isin).c_ask(1);
+        beta_ask = self.TriggersData.TrendDetectionTrig.(isin).c_ask(2);
+        gamma_ask = self.TriggersData.TrendDetectionTrig.(isin).c_ask(3);
+
+        alpha_bid = self.TriggersData.TrendDetectionTrig.(isin).c_bid(1);
+        beta_bid = self.TriggersData.TrendDetectionTrig.(isin).c_bid(2);
+        gamma_bid = self.TriggersData.TrendDetectionTrig.(isin).c_bid(3);
+
+        myData = self.AssetMgr.GetDataFromHistory(isin, {'askLimitPrice', 'askVolume', 'bidLimitPrice', 'bidVolume'}, 0);
+
+        if ~any(cellfun(@isempty, myData.askLimitPrice))
+          if length(self.TriggersData.TrendDetectionTrig.(isin).l_ask) == 0
+            self.TriggersData.TrendDetectionTrig.(isin).l_ask(1) = myData.askLimitPrice{1}(1);
+            self.TriggersData.TrendDetectionTrig.(isin).b_ask(1) = 0.0;
+            self.TriggersData.TrendDetectionTrig.(isin).b2_ask(1) = 0.0;
+          elseif length(self.TriggersData.TrendDetectionTrig.(isin).l_ask) == 1
+            self.TriggersData.TrendDetectionTrig.(isin).l_ask(2) = myData.askLimitPrice{1}(1);
+            self.TriggersData.TrendDetectionTrig.(isin).b_ask(2) = myData.askLimitPrice{1}(1) - self.TriggersData.TrendDetectionTrig.(isin).l_ask(1);
+            self.TriggersData.TrendDetectionTrig.(isin).b2_ask(2) = self.TriggersData.TrendDetectionTrig.(isin).b_ask(2);
+          end
+
+          if length(self.TriggersData.TrendDetectionTrig.(isin).l_ask) > 1
+            % Update level
+            self.TriggersData.TrendDetectionTrig.(isin).l_ask(end+1) = alpha_ask * myData.askLimitPrice{1}(1) + (1 - alpha_ask) * (self.TriggersData.TrendDetectionTrig.(isin).l_ask(end) + self.TriggersData.TrendDetectionTrig.(isin).b_ask(end));
+
+            % Update trend
+            self.TriggersData.TrendDetectionTrig.(isin).b_ask(end+1) = beta_ask * ( self.TriggersData.TrendDetectionTrig.(isin).l_ask(end) - self.TriggersData.TrendDetectionTrig.(isin).l_ask(end-1) ) + ( 1 - beta_ask ) * self.TriggersData.TrendDetectionTrig.(isin).b_ask(end);
+
+            % Update trend's trend
+            self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end+1) = gamma_ask * ( self.TriggersData.TrendDetectionTrig.(isin).b_ask(end) - self.TriggersData.TrendDetectionTrig.(isin).b_ask(end-1) ) + (1 - gamma_ask) * self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end);
+          end
+        end
+
+        if ~any(cellfun(@isempty, myData.bidLimitPrice))
+          if length(self.TriggersData.TrendDetectionTrig.(isin).l_bid) == 0
+            self.TriggersData.TrendDetectionTrig.(isin).l_bid(1) = myData.bidLimitPrice{1}(1);
+            self.TriggersData.TrendDetectionTrig.(isin).b_bid(1) = 0.0;
+            self.TriggersData.TrendDetectionTrig.(isin).b2_bid(1) = 0.0;
+          elseif length(self.TriggersData.TrendDetectionTrig.(isin).l_bid) == 1
+            self.TriggersData.TrendDetectionTrig.(isin).l_bid(2) = myData.bidLimitPrice{1}(1);
+            self.TriggersData.TrendDetectionTrig.(isin).b_bid(2) = myData.bidLimitPrice{1}(1) - self.TriggersData.TrendDetectionTrig.(isin).l_bid(1);
+            self.TriggersData.TrendDetectionTrig.(isin).b2_bid(2) = self.TriggersData.TrendDetectionTrig.(isin).b_bid(2);
+          end
+
+          if length(self.TriggersData.TrendDetectionTrig.(isin).l_bid) > 1
+            % Update level
+            self.TriggersData.TrendDetectionTrig.(isin).l_bid(end+1) = alpha_bid * myData.bidLimitPrice{1}(1) + (1 - alpha_bid) * (self.TriggersData.TrendDetectionTrig.(isin).l_bid(end) + self.TriggersData.TrendDetectionTrig.(isin).b_bid(end));
+
+            % Update trend
+            self.TriggersData.TrendDetectionTrig.(isin).b_bid(end+1) = beta_bid * ( self.TriggersData.TrendDetectionTrig.(isin).l_bid(end) - self.TriggersData.TrendDetectionTrig.(isin).l_bid(end-1) ) + ( 1 - beta_bid ) * self.TriggersData.TrendDetectionTrig.(isin).b_bid(end);
+
+            % Update trend's trend
+            self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end+1) = gamma_bid * ( self.TriggersData.TrendDetectionTrig.(isin).b_bid(end) - self.TriggersData.TrendDetectionTrig.(isin).b_bid(end-1) ) + (1 - gamma_bid) * self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end);
+          end
+        end
+
+        % fprintf('%d -- (%7s) l_ask: %5.2f, b_ask: %6.4f, b2_ask: %6.4f, l_bid: %5.2f, b_bid: %6.4f, b2_bid: %6.4f\n', self.AssetMgr.CurrentIndex.total, isin, self.TriggersData.TrendDetectionTrig.(isin).l_ask(end), self.TriggersData.TrendDetectionTrig.(isin).b_ask(end), self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end), self.TriggersData.TrendDetectionTrig.(isin).l_bid(end), self.TriggersData.TrendDetectionTrig.(isin).b_bid(end), self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end))
+      end
+    end
+
+    function thePrice = GetVolumePrice(~, aP, aV, aLimitVol)
       % Computes the average price of purchasing a volume `aLimitVol`.
       myVcs = cumsum(aV);
       myIndex = myVcs < aLimitVol;
@@ -219,7 +276,7 @@ classdef TradingRobot < AutoTrader
       end
 
       myData = self.AssetMgr.GetDataFromHistory(aISIN, myLabels, 0);
-      if length(myData.(myLabels{1}){end}) > 0 && length(myData.(myLabels{2}){end}) > 0
+      if length(myData.(myLabels{1}){end}) && length(myData.(myLabels{2}){end})
         self.Trade(aISIN, myData.(myLabels{1}){end}(end), aV);
       end
     end
@@ -232,6 +289,7 @@ classdef TradingRobot < AutoTrader
         self.TradeFullStock(isin, -myPos)
       end
 
+      fprintf('Total updates: %d\n', self.AssetMgr.CurrentIndex.total)
       self.AssetMgr.delete();
     end
   end
