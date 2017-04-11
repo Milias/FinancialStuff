@@ -88,48 +88,112 @@ classdef TradingRobot < AutoTrader
       end
     end
 
+    function theIdx = CheckActiveTrades(self, aISIN, aP, aSide)
+      for i = 1:length(self.AssetMgr.ActiveTrades.(aISIN))
+        trade = self.AssetMgr.ActiveTrades.(aISIN){i};
+        if trade.volume(1)*aSide < 0
+          continue
+        end
+
+        myExpectedProfit = abs(sum(trade.volume)) * aP;
+        
+        if aSide * myExpectedProfit > aSide * abs(sum(trade.volume .* trade.price))
+          theIdx = i;
+          return
+        end
+      end
+      theIdx = 0;
+    end
+
     % Buy when movmean(S_ask, [lookback 0]) < S_bid for dtbmax ticks.
     function TrendTradeTrig(self)
       for isin = self.AssetMgr.ISINs
         isin = isin{1};
 
-        myData = self.AssetMgr.GetDataFromHistory(isin, {'askLimitPrice', 'askVolume', 'bidLimitPrice', 'bidVolume'}, 1);
+        myData = self.AssetMgr.GetDataFromHistory(isin, {'askLimitPrice', 'askVolume', 'bidLimitPrice', 'bidVolume'}, 0);
 
         if ~any(cellfun(@isempty, myData.askLimitPrice)) && ~any(cellfun(@isempty, myData.bidLimitPrice))
           if length(self.TriggersData.TrendDetectionTrig.(isin).b2_ask) > 1 
-            if self.TriggersData.TrendDetectionTrig.(isin).b_ask(end) < 0 && self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end)*self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end-1) < 0
+            % Check when we are at a minimum (d2V > 0, dV == 0)
+            if self.TriggersData.TrendDetectionTrig.(isin).b2_ask(end) > 0 && self.TriggersData.TrendDetectionTrig.(isin).b_ask(end)*self.TriggersData.TrendDetectionTrig.(isin).b_ask(end-1) < 0
               
-              self.TriggersData.TrendTradeTrig.tick_count_buy = 0;
-
               myPos = self.AssetMgr.GetISINPosition(isin);
               myVol = min(max(0, self.AlgoParams.max_trading_volume.(isin) - myPos), myData.askVolume{1}(1));
               
               if myVol > 0
-                fprintf('\nTrendTradeTrig - Buy\n');
-                if self.Trade(isin, myData.askLimitPrice{1}(1), myVol) > 0
-                  %self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+                
+                % Check if we have any trades that can be improved.
+                myIdx = self.CheckActiveTrades(isin, myData.askLimitPrice{1}(1), -1)
+                myTradedVolume = 0;
+
+                if myIdx && ~isempty(self.AssetMgr.ActiveTrades.(isin))
+                  trade = self.AssetMgr.ActiveTrades.(isin){myIdx};
+                  % Buy enough to complete the trade.
+                  myTradePos = abs(sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.volume));
+                  myTrades = self.Trade(isin, myData.askLimitPrice{1}(1), min(myTradePos, myVol));
+                  fprintf('Before -- Trade: %3d, Pos: %3.0f, Profit: %5.2f\n', myIdx, myTradePos, -sum(trade.price .* trade.volume));
+
+                  if myTrades
+                    fprintf('\nTrendTradeTrig - Buy (complete) \n');
+                    myTradedVolume = self.ownTrades.side(end-myTrades+1:end) .* self.ownTrades.volume(end-myTrades+1:end);
+                    self.AssetMgr.UpdateTrade(isin, myIdx, self.ownTrades.price(end-myTrades+1:end), myTradedVolume);
+                    self.AssetMgr.ArchiveCompletedTrades();
+                  end
+                  fprintf('After -- Trade: %3d, Pos: %3.0f, Profit: %5.2f\n', myIdx, sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.volume), -sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.price .* self.AssetMgr.ActiveTrades.(isin){myIdx}.volume));
+                end
+                
+                if myVol - myTradedVolume > 0 && isempty(self.AssetMgr.ActiveTrades.(isin))
+                  myTrades = self.Trade(isin, myData.askLimitPrice{1}(1), myVol - myTradedVolume);
+                  if myTrades
+                    fprintf('\nTrendTradeTrig - Buy (new) \n');
+                    self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+                  end
                 end
               end
             end
           end
 
           if length(self.TriggersData.TrendDetectionTrig.(isin).b2_bid) > 1
-            if self.TriggersData.TrendDetectionTrig.(isin).b_bid(end) > 0 && self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end)*self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end-1) < 0
-              self.TriggersData.TrendTradeTrig.tick_count_sell = 0;
-
+            if self.TriggersData.TrendDetectionTrig.(isin).b2_bid(end) < 0 && self.TriggersData.TrendDetectionTrig.(isin).b_bid(end)*self.TriggersData.TrendDetectionTrig.(isin).b_bid(end-1) < 0
               myPos = self.AssetMgr.GetISINPosition(isin);
               myVol = min(max(0, self.AlgoParams.max_trading_volume.(isin) + myPos), myData.bidVolume{1}(1));
             
               if myVol > 0
-                fprintf('\nTrendTradeTrig - Sell\n');
-                if self.Trade(isin, myData.bidLimitPrice{1}(1), -myVol) > 0
-                  %self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+                % Check if we have any trades that can be improved.
+                myIdx = self.CheckActiveTrades(isin, myData.bidLimitPrice{1}(1), 1)
+                myTradedVolume = 0;
+
+                if myIdx && ~isempty(self.AssetMgr.ActiveTrades.(isin))
+                  % Sell enough to complete the trade.
+                  trade = self.AssetMgr.ActiveTrades.(isin){myIdx};
+                  myTradePos = abs(sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.volume));
+
+                  fprintf('Before -- Trade: %3d, Pos: %3.0f, Profit: %5.2f\n', myIdx, myTradePos, -sum(trade.price .* trade.volume));
+                  myTrades = self.Trade(isin, myData.bidLimitPrice{1}(1), -min(myTradePos, myVol));
+
+                  if myTrades
+                    fprintf('\nTrendTradeTrig - Sell (complete) \n');
+                    % myTradedVolume is negative.
+                    myTradedVolume = self.ownTrades.side(end-myTrades+1:end) .* self.ownTrades.volume(end-myTrades+1:end);
+                    self.AssetMgr.UpdateTrade(isin, myIdx, self.ownTrades.price(end-myTrades+1:end), myTradedVolume);
+                    self.AssetMgr.ArchiveCompletedTrades();
+                  end
+                  fprintf('After -- Trade: %3d, Pos: %3.0f, Profit: %5.2f\n', myIdx, sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.volume), -sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.price .* self.AssetMgr.ActiveTrades.(isin){myIdx}.volume));
+                end
+                
+                if myVol + myTradedVolume > 0 && isempty(self.AssetMgr.ActiveTrades.(isin))
+                  myTrades = self.Trade(isin, myData.bidLimitPrice{1}(1), - myVol - myTradedVolume);
+                  if myTrades
+                    fprintf('\nTrendTradeTrig - Sell (new) \n');
+                    self.AssetMgr.GenerateNewTrade(isin, self.ownTrades.price(end), self.ownTrades.side(end)*self.ownTrades.volume(end));
+                  end
                 end
               end
             end
           end
         end
       end
+      self.AssetMgr.ArchiveCompletedTrades();
     end
 
     function TradeMatchTrig(self)
@@ -290,7 +354,7 @@ classdef TradingRobot < AutoTrader
       end
 
       fprintf('Total updates: %d\n', self.AssetMgr.CurrentIndex.total)
-      self.AssetMgr.delete();
+      %self.AssetMgr.delete();
     end
   end
 end

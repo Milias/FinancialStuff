@@ -140,11 +140,16 @@ classdef AssetManager < handle
         myIdx = cellfun(@(trade) abs(sum(trade.volume)) < 0.01, self.ActiveTrades.(isin));
 
         % Updates the CompletedTrades cell array with the new elements from ActiveTrades.
-        self.CompletedTrades.(isin)(length(self.CompletedTrades.(isin))+1:length(self.CompletedTrades.(isin))+nnz(myIdx)) = self.ActiveTrades.(isin)(myIdx);
+        self.CompletedTrades.(isin)(end+1:end+nnz(myIdx)) = self.ActiveTrades.(isin)(myIdx);
 
         % Removes completed trades from ActiveTrades.
         self.ActiveTrades.(isin) = self.ActiveTrades.(isin)(~myIdx);
       end
+    end
+
+    function UpdateTrade(self, aISIN, aIdx, aP, aV)
+      self.ActiveTrades.(aISIN){aIdx}.price(end+1:end+length(aP)) = aP;
+      self.ActiveTrades.(aISIN){aIdx}.volume(end+1:end+length(aV)) = aV;
     end
 
     function UpdateAssets(self, aISIN, aP, aV)

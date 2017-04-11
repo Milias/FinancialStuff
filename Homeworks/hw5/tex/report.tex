@@ -1,0 +1,175 @@
+\documentclass[8 pt]{article}
+
+\usepackage[utf8x]{inputenc}
+\usepackage{dsfont}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{tensor}
+\usepackage{mathtools}
+\usepackage[T1]{fontenc}
+%\usepackage[spanish]{babel}
+\usepackage[cm]{fullpage}
+\usepackage{graphicx}
+%\usepackage{float}
+\usepackage{bm}
+\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{mdwlist}
+\usepackage{parskip}
+\usepackage{listings}
+\usepackage{color}
+%\usepackage{epstopdf}
+\usepackage{tikz,datatool}
+\usepackage{hyperref}
+\usepackage{mathabx}
+\usepackage{multicol}
+\usepackage{eurosym}
+\usepackage{caption}
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\AtBeginDocument{
+  \let\myThePage\thepage
+  \renewcommand{\thepage}{\oldstylenums{\myThePage}}
+}
+
+\newcommand{\gra}{$^\text{o}$}
+\newcommand{\dif}{\text{d}}
+\newcommand{\avg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\ket}[1]{\left| #1 \right\rangle}
+\newcommand{\bra}[1]{\left\langle #1 \right|}
+\newcommand{\bket}[2]{\left\langle #1 \middle| #2 \right\rangle}
+\newcommand{\der}[2]{\frac{\text{d} #1}{\text{d} #2}}
+\newcommand{\prt}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\dert}[3]{\frac{\text{d}^#3 #1}{\text{d} #2^#3}}
+\newcommand{\prtt}[3]{\frac{\partial^#3 #1}{\partial #2^#3}}
+\newcommand{\dl}{\mathcal{L}}
+\newcommand{\dha}{\mathcal{H}}
+\newcommand{\vol}{\text{vol}}
+\renewcommand{\vec}[1]{\pmb{#1}}
+
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+
+\newenvironment{Figure}
+  {\par\medskip\noindent\minipage{\linewidth}}
+  {\endminipage\par\medskip}
+
+\begin{document}
+
+\begin{minipage}{\textwidth}
+    \centering
+    \Large \textbf{\textsc{Homework 3: Dual Listing Arbitrage}}
+    \vspace{0.5cm}
+
+    \small \textsc{Francisco García Flórez, Joris van Lammeren, Wouter Varenkamp}
+    \vspace{0.5cm}
+
+    \begin{minipage}{0.8\textwidth}
+      \textbf{Abstract.} In this homework we study pure arbitrage as a way of making risk-free profits by trading some volume between two markets. Even though profits per trade are low compared to the amount of cash involved, it is still possible to make a significant profit over time.
+    \end{minipage}
+\end{minipage}
+
+\vspace{0.5cm}
+
+\begin{multicols*}{2}
+
+  \section{Trading robot}
+
+  In this homework we focus on pure arbitrage, meaning buying low in one market and selling high in another, however we can only use immediate transactions (fill or kill), and remain with a null position.
+
+  The trading algorithm is implemented in three separate steps, executed every time there is a book update. These three steps are \emph{offers and bids checking}, \emph{trading} and \emph{book updating}, each of them explained in the following sections.
+
+  We consider each book to be a set of price and volume pairs, that we denote as $(P^{a,b}_i, V^{a,b}_i)$, where the superscript $a, b$ refer to \emph{ask} and \emph{bid} respectively, and $i\in [1, N_{a,b}]$ is the index of the entry. In a more general setting we would also want to specify the market, however in this case there are only two options: buying \texttt{CHI\_AKZA} and selling \texttt{EUR\_AKZA} or the opposite, so references to bids or asks are implicitly connected to the right market.  
+
+  \paragraph{Offers and bids checking}
+
+  In the first place, right after the robot receives a book update, it computes a matrix of logical values (\texttt{True} or \texttt{False}) representing which trades are profitable. This matrix $T$ is computed as follows:
+
+  \begin{equation*}
+    T_{ij} = P^a_i < P^b_j ~,~~ \forall i,j \in [1, N_a]\times[1, N_b] ~~.
+  \end{equation*}
+
+  Since not every time we receive a book update there are going to be any profitable trades, we need to check that at least one of the elements of $T$ is \texttt{True}, which we could check by computing the product of its components:
+
+  \begin{equation*}
+    \text{\texttt{check}} = \bigoplus_{i, j}^{N_a, N_b} T_{ij} ~~,
+  \end{equation*}
+
+  thus if \texttt{check} is \texttt{True}, we proceed with the next step, in which we compute the data we need for the \emph{trading} part. This data is contained in two matrices, each element composed of a pair of prices and volumes:
+
+  \begin{align*}
+    \begin{split}
+      V_{ij} &= ( V^a_i, V^b_j ) ~,~~ \forall i,j \in [1, N_a]\times[1, N_b] \\
+      P_{ij} &= ( P^a_i, P^b_j ) ~,~~ \forall i,j \in [1, N_a]\times[1, N_b]
+    \end{split}
+    ~~.
+  \end{align*}
+
+  However we still need to do one extra computation with $V$, since the volume that can be traded is limited by either $V^a_i$ or $V^b_i$ the final volume we can trade is given by $\tilde V_{ij} = \min(V_{ij,1}, V_{ij, 2})$, where the subscript $1$ and $2$ reference each element of the pair.
+
+  Finally, selecting components $\tilde V_{ij}$ and $P_{ij}$ for which $T_{ij} = $ \texttt{True}, we can proceed to the next step.
+
+  \paragraph{Trading}
+
+  Now, taking the volumes and prices selected in the last step and iterating over them, buying at price $P^a_i$ and selling at $P^b_j$, we perform the profitable trades. Algorithmically this can be implemented as
+
+  \begin{verbatim}
+    for i, j such that T[i, j] is True {
+      buy(ask_price[i], limit_volume[i, j])
+      sell(bid_price[j], limit_volume[i, j])
+    }
+  \end{verbatim}
+
+  This step can be slightly improved by optimizing the traded volume when more there are more than one trades possible, maximizing the volume we buy selling to more than one bidder and vice versa. However there is one detail that we need to take care of, discussed in the next step.
+
+  \paragraph{Book updating}
+
+  Finally we can proceed to perform the last step of the implementation: update the books. After every successful transaction the market changes, but in the next book update only one of the books will be saved. This means that we need to manually modify the stored book after selling and buying, so that the algorithm doesn't get tricked into sending the same transaction into the market several times.
+
+  We achieve this by looking up the entry by price and either removing it completely if the volume moved is maximum, or adjusting it if it isn't.
+
+  \section{Results}
+
+  As we can see in Table \ref{table:assets} (see Appendix) as we expected the cash moved is several orders of magnitude higher than profits, but these are completely risk-free earned in about 21 minutes of trading. Since this is only pure arbitrage there are many opportunities to improve on it, basically introducing all the possible strategies that characterize algorithmic trading.
+
+\section{Appendix}
+
+\begin{minipage}{\textwidth}
+\begin{center}
+  \Large
+  \label{table:cash}
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    \# & CHI (Buy) & CHI (Sell) & EUR (Buy) & EUR (Sell) & Profit \\ \hline
+    \input{tables/profits.tex}
+  \end{tabular}
+  \captionof{table}{Cash moved for each feed.}
+\end{center}
+
+\vspace{1.0cm}
+
+\begin{center}
+  \Large
+  \label{table:assets}
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    \# & CHI (Buy) & CHI (Sell) & EUR (Buy) & EUR (Sell) & Position \\ \hline
+    \input{tables/assets.tex}
+  \end{tabular}
+  \captionof{table}{Assets moved for each feed.}
+\end{center}
+\end{minipage}
+
+\begin{thebibliography}{28}
+\raggedright
+\addcontentsline{toc}{section}{Bibliography}
+
+\bibitem{Wilmott} P. Wilmott et al, \emph{The Mathematics of Financial Derivatives}, 1995.
+
+\end{thebibliography}
+
+\end{multicols*}
+
+\end{document}
