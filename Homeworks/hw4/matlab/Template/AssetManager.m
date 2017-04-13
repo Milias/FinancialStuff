@@ -129,7 +129,8 @@ classdef AssetManager < handle
 
     function GenerateNewTrade(self, aISIN, aP, aV)
       self.ActiveTrades.(aISIN){length(self.ActiveTrades.(aISIN)) + 1} = struct('price', [aP], 'volume', [aV], 'time', [self.CurrentIndex.total]);
-      fprintf('Trade %d (%7s) added.\n', length(self.ActiveTrades.(aISIN)), aISIN)
+      %fprintf('Trade added\n')
+      fprintf('Trade (%7s, %5.2f, %3.0f) added.\n', aISIN, aP, aV)
     end
 
     function ArchiveCompletedTrades(self)

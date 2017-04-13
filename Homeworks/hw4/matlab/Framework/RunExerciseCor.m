@@ -15,7 +15,7 @@ myTradingRobot = TradingRobot();
 myExchange.RegisterAutoTrader(myTradingRobot);
 myTradingRobot.StartAutoTrader(myExchange);
 
-myFeedPublisher.StartShortFeed(myFeed);
+myFeedPublisher.StartFeed(myFeed);
 
 myTradingRobot.Unwind();
 %ReportFeedHist(myTradingRobot);
