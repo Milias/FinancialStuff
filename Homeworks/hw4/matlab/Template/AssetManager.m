@@ -128,9 +128,9 @@ classdef AssetManager < handle
     end
 
     function GenerateNewTrade(self, aISIN, aP, aV)
-      self.ActiveTrades.(aISIN){length(self.ActiveTrades.(aISIN)) + 1} = struct('price', [aP], 'volume', [aV], 'time', [self.CurrentIndex.total]);
+      self.ActiveTrades.(aISIN){end+1} = struct('price', [aP], 'volume', [aV], 'time', [self.CurrentIndex.total], 'uuid', char(java.util.UUID.randomUUID));
       %fprintf('Trade added\n')
-      fprintf('Trade (%7s, %5.2f, %3.0f) added.\n', aISIN, aP, aV)
+      fprintf('Trade (%7s, %5.2f, %3.0f, %s) added.\n', aISIN, aP, aV, self.ActiveTrades.(aISIN){end}.uuid)
     end
 
     function ArchiveCompletedTrades(self)

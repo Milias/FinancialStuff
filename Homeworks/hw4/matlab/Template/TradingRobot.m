@@ -51,15 +51,6 @@ classdef TradingRobot < AutoTrader
     end
 
     function InitTriggers(self)
-      % == TrendTradeTrig ==
-      % Trade when the trend changes.
-      self.Triggers{end + 1} = 'TrendTradeTrig';
-      self.TriggersData.TrendTradeTrig = struct('tick_count_buy', 0, 'tick_count_sell', 0);
-
-      % == ReducePositionTrig ==
-      %self.Triggers{end + 1} = 'TradeMatchTrig';
-      self.TriggersData.TradeMatchTrig = struct('tick_count', 0);
-
       % == Detect Trends ==
       % Double exponential smoothing for now with weighted second derivative.
       % TODO: forecasting and back fitting?
@@ -79,6 +70,15 @@ classdef TradingRobot < AutoTrader
           [self.TriggersData.TrendDetectionTrig.(isin).c(:).(label)] = [0.05 0.08 0.12];
         end
       end
+      
+      % == TrendTradeTrig ==
+      % Trade when the trend changes.
+      self.Triggers{end + 1} = 'TrendTradeTrig';
+      self.TriggersData.TrendTradeTrig = struct('tick_count_buy', 0, 'tick_count_sell', 0);
+
+      % == ReducePositionTrig ==
+      %self.Triggers{end + 1} = 'TradeMatchTrig';
+      self.TriggersData.TradeMatchTrig = struct('tick_count', 0);
     end
 
     function HandleDepthUpdate(self, ~, aDepth)
@@ -96,19 +96,13 @@ classdef TradingRobot < AutoTrader
       end
     end
 
-    function theIdx = CheckActiveTrades(self, aISIN, aP, aSide)
-      theIdx = cell(0);
+    function theProfits = CheckActiveTrades(self, aISIN, aP, aSide)
+      % Returns profit from each trade.
+      theProfits = zeros(length(self.AssetMgr.ActiveTrades.(aISIN)), 1);
+
       for i = 1:length(self.AssetMgr.ActiveTrades.(aISIN))
         trade = self.AssetMgr.ActiveTrades.(aISIN){i};
-        if trade.volume(1)*aSide < 0
-          continue
-        end
-
-        myExpectedProfit = abs(sum(trade.volume)) * aP;
-        
-        if aSide * myExpectedProfit > aSide * abs(sum(trade.volume .* trade.price))
-          theIdx{end+1} = i;
-        end
+        theProfits(i, :) = (trade.volume(1) * aSide > 0) * max(0, aSide * (sum(trade.volume) * aP - sum(trade.volume .* trade.price)));
       end
     end
 
@@ -121,7 +115,7 @@ classdef TradingRobot < AutoTrader
 
         myData = self.AssetMgr.GetDataFromHistory(isin, {'askLimitPrice', 'askVolume', 'bidLimitPrice', 'bidVolume'}, 0);
 
-        if ~isempty(myData.askLimitPrice) && ~isempty(myData.bidLimitPrice)
+        if ~isempty(myData.askLimitPrice) %&& ~isempty(myData.bidLimitPrice)
           if length(self.TriggersData.TrendDetectionTrig.(isin).wa) > 1
 
             myWA = self.TriggersData.TrendDetectionTrig.(isin).wa{end};
@@ -129,13 +123,34 @@ classdef TradingRobot < AutoTrader
 
             % Check minimum, d2S > 0 and dS == 0.
             if myWA(1, 3) > 0 && myOldWA(1, 2) * myWA(1, 2) < 0
-              % We have to check each entry for a profitable price.
-              myIdx = arrayfun(@(p) self.CheckActiveTrades(isin, p), myData.askLimitPrice{1}, 'UniformOutput', false);
+              if ~isempty(self.AssetMgr.ActiveTrades.(aISIN))
+                % We have to check each entry for a profitable price.
+                mySide = -1;
+                myProfits = self.CheckActiveTrades(isin, myData.askLimitPrice{1}, mySide);
 
-              for idx = myIdx
-                idx = idx{1};
+                % And sort them by column (first dimension).
+                [mySortedProfits, mySortedIdx] = sort(myProfts, 1, 'descending');
+              
+                % Maximum volume we can spend per book entry.
+                myVol = myData.askVolume{1};
 
-
+                for i = 1:size(theProfits, 2)
+                  for j = 1:size(theProfits, 1)
+                    trade = self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j, i)};
+                    myTrades = self.Trade(isin, myData.askLimitPrice{1}(i), mySide * sum(trade.volume));
+                    if myTrades
+                      fprintf('TrendTradeTrig - Buy (complete)\n\n');
+                      fprintf('Before -- Trade: %s, Pos: %3.0f, Profit: %6.2f\n', trade.uuid, sum(trade.volume), -sum(trade.price .* trade.volume));
+                      myTradedVolume = self.ownTrades.side(end-myTrades+1:end) .* self.ownTrades.volume(end-myTrades+1:end);                   
+                      self.AssetMgr.UpdateTrade(isin, mySortedIdx(j, i), self.ownTrades.price(end-myTrades+1:end), myTradedVolume);
+                      myVol(i) = myVol(i) - myTradedVolume;
+                      fprintf('After  -- Trade: %s, Pos: %3.0f, Profit: %6.2f\n', trade.uuid, sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.volume), -sum(self.AssetMgr.ActiveTrades.(isin){myIdx}.price .* self.AssetMgr.ActiveTrades.(isin){myIdx}.volume));
+                    end
+                    if myVol(i) <= 0
+                      break
+                    end
+                  end
+                end
               end
             end
           end
