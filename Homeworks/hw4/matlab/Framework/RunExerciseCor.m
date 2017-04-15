@@ -15,22 +15,29 @@ myTradingRobot = TradingRobot();
 myExchange.RegisterAutoTrader(myTradingRobot);
 myTradingRobot.StartAutoTrader(myExchange);
 
-myFeedPublisher.StartFeed(myFeed);
+myFeedPublisher.StartShortFeed(myFeed);
 
 myTradingRobot.Unwind();
 %ReportFeedHist(myTradingRobot);
 Report(myTradingRobot.ownTrades);
 
-plot(myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.l_ask-mean(myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.l_ask), 'LineWidth', 3, 'Color', 'red')
-hold on
-plot(myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.b_ask*100, 'LineWidth', 3, 'Color', 'blue')
-plot(myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.b2_ask*5000, 'LineWidth', 3, 'Color', 'green')
-%plot(cellfun(@GetFirst, myTradingRobot.AssetMgr.DepthHistory.DBK_EUR) - mean(cellfun(@GetFirst, myTradingRobot.AssetMgr.DepthHistory.DBK_EUR)), 'LineWidth', 3, 'Color', 'yellow')
+level = cellfun(@(wa) wa(1, 1), myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.wa);
+trend = cellfun(@(wa) wa(1, 2), myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.wa);
+dtrend = cellfun(@(wa) wa(1, 3), myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.wa);
+ask = cellfun(@(wa) wa(5, 1), myTradingRobot.TriggersData.TrendDetectionTrig.DBK_EUR.wa);
 
-function v = GetFirst(depth)
-  if ~isempty(depth.askLimitPrice)
-    v = depth.askLimitPrice(1);
-  else
-    v = 0.0;
-  end
-end
+firstIdx = find(level>0, 1);
+level = level(firstIdx:end);
+trend = trend(firstIdx:end);
+dtrend = dtrend(firstIdx:end);
+ask = ask(firstIdx:end);
+
+mtrend = max(trend);
+mdtrend = max(dtrend);
+
+plot(trend/mtrend, 'LineWidth', 2, 'Color', 'green')
+hold on
+plot(dtrend/mdtrend, 'LineWidth', 2, 'Color', 'blue')
+plot(level-mean(level), 'LineWidth', 3, 'Color', 'red')
+plot(ask-mean(ask), '-', 'LineWidth', 1, 'Color', 'black')
+hold off
