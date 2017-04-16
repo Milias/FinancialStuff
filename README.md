@@ -6,9 +6,11 @@ Programs for the course "Applying Mathematics in Finance".
 
 In no specific order.
 
-* Profiling main functions and optimize the code.
+* -Profiling main functions- and optimize the code.
 * Compute optimal initial values for the trend calculation.
 * Determination of volume to buy/sell, and holding limitations.
 * Implement algorithm to use correlation information.
 * Implement self-correcting algorithm for the trend coefficients.
 * Stop-loss algorithm.
+* Have more than one trade at the same time.
+

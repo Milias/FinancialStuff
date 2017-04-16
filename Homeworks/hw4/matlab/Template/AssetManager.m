@@ -7,10 +7,14 @@ classdef AssetManager < handle
 
     ActiveTrades
     CompletedTrades
+
+    InitSize
   end
 
   methods
-    function self = AssetManager 
+    function self = AssetManager(aInitSize) 
+      self.InitSize = aInitSize;
+
       % Struct where we store the price and volume of our assets.
       % It's structure is self.Assets.ISIN = {struct('price', 0.0, 'volume', 0)}.
       self.Assets = struct;
@@ -28,7 +32,7 @@ classdef AssetManager < handle
     
       % Keeping track of how many book updates we've received.
       % Total,  and one index per ISIN.
-      self.CurrentIndex = struct('total', 0);
+      self.CurrentIndex = struct('total', 1);
     end
 
     function Init(self, aISINs)
@@ -60,24 +64,15 @@ classdef AssetManager < handle
       theVolume = sum(cellfun(@(isin) sum(cellfun(@(asset) asset.volume, self.Assets.(isin))), self.ISINs));
     end
 
-    function theData = GetDataFromHistory(self, aISIN, aValues, aT)
+    function theData = GetDataFromHistory(self, aISIN, aT)
       % Returns a cell of vectors containing aValue from the last aT depths from aISIN,
       % sorted from newest to oldest. NOTE: here aT counts global ticks, not only ticks
       % counted in self.CurrentIndex.(aISIN).
-      theData = struct;
-      
-      for myVal = aValues
-        myVal = myVal{1};
-        [theData(:).(myVal)] = cellfun(@(depth) depth.(myVal), {self.DepthHistory.(aISIN){self.CurrentIndex.total:-1:max(1, self.CurrentIndex.total - aT)}}, 'UniformOutput', false);
-      end
-    end
 
-    function theData = ComputeDataFromHistory(self, aISIN, aValues, aT, aFunc)
-      % Computes values using the history.
-      theData = self.GetDataFromHistory(aISIN, aValues, aT);
-
-      for i = 1:length(aValues)
-        theData.(aValues{i}) = { cellfun(@(x) aFunc{i}(x), theData.(aValues{i})) };
+      if nargin == 2
+        theData = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)};
+      else
+        theData = {self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN):-1:self.CurrentIndex.(aISIN)-aT}};
       end
     end
 
@@ -94,34 +89,30 @@ classdef AssetManager < handle
     end
 
     function UpdateDepths(self, aDepth)
-      % Increasing the amount of book updates we have received.
+      % Copy depths for each ISIN.
+      for isin = self.ISINs
+        isin = isin{1}; 
+
+        if self.CurrentIndex.total == 1
+          self.DepthHistory.(isin){1} = struct('ISIN', isin, 'ticksize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
+
+        elseif self.CurrentIndex.(isin) > 1
+          self.DepthHistory.(isin){self.CurrentIndex.(isin)} = self.DepthHistory.(isin){self.CurrentIndex.(isin)-1};
+        end  
+      end
+
       self.CurrentIndex.total = self.CurrentIndex.total + 1;
       self.CurrentIndex.(aDepth.ISIN) = self.CurrentIndex.(aDepth.ISIN) + 1;
-
-      % Copy depths for each ISIN.
-      for myISIN = self.ISINs
-        myISIN = myISIN{1}; 
-        if length(self.DepthHistory.(myISIN))
-          self.DepthHistory.(myISIN){end+1} = self.DepthHistory.(myISIN){end};
-        else
-          self.DepthHistory.(myISIN){1} = struct('ISIN', myISIN, 'ticksize', 0.0, 'bidLimitPrice', [], 'bidVolume', [], 'askLimitPrice', [], 'askVolume', []);
-        end
-      end
-
-      if length(self.DepthHistory.(aDepth.ISIN))
-        self.DepthHistory.(aDepth.ISIN){end} = aDepth;
-      else 
-        self.DepthHistory.(aDepth.ISIN){1} = aDepth;
-      end
+      self.DepthHistory.(aDepth.ISIN){self.CurrentIndex.(aDepth.ISIN)} = aDepth;
     end
 
     function CheckISIN(self, aISIN)
       myTemp = strfind(self.ISINs, aISIN);
       if ~any(vertcat(myTemp{:}))
         self.ISINs{end+1} = aISIN;
-        [self.CurrentIndex(:).(aISIN)] = 0;
+        [self.CurrentIndex(:).(aISIN)] = 1;
         [self.Assets(:).(aISIN)] = cell(0);
-        [self.DepthHistory(:).(aISIN)] = cell(0);
+        [self.DepthHistory(:).(aISIN)] = cell(self.InitSize, 1);
         [self.ActiveTrades(:).(aISIN)] = cell(0);
         [self.CompletedTrades(:).(aISIN)] = cell(0);
       end
@@ -151,6 +142,7 @@ classdef AssetManager < handle
     function UpdateTrade(self, aISIN, aIdx, aP, aV)
       self.ActiveTrades.(aISIN){aIdx}.price(end+1:end+length(aP)) = aP;
       self.ActiveTrades.(aISIN){aIdx}.volume(end+1:end+length(aV)) = aV;
+      self.ActiveTrades.(aISIN){aIdx}.time(end+1:end+length(aV)) = self.CurrentIndex.total;
     end
 
     function UpdateAssets(self, aISIN, aP, aV)
@@ -170,13 +162,13 @@ classdef AssetManager < handle
         myVolume = 'bidVolume';
       end
 
-      myIndex = abs(self.DepthHistory.(aISIN){end}.(myPrice) - aP) < 0.01;
+      myIndex = abs(self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myPrice) - aP) < 0.01;
 
-      if abs(aV) < self.DepthHistory.(aISIN){end}.(myVolume)(myIndex)
-        self.DepthHistory.(aISIN){end}.(myVolume)(myIndex) = self.DepthHistory.(aISIN){end}.(myVolume)(myIndex) - abs(aV);
+      if abs(aV) < self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(myIndex)
+        self.DepthHistory.(aISIN){end}.(myVolume)(myIndex) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(myIndex) - abs(aV);
       else
-        self.DepthHistory.(aISIN){end}.(myVolume) = self.DepthHistory.(aISIN){end}.(myVolume)(~myIndex);
-        self.DepthHistory.(aISIN){end}.(myPrice) = self.DepthHistory.(aISIN){end}.(myPrice)(~myIndex);
+        self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(~myIndex);
+        self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myPrice) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myPrice)(~myIndex);
       end
     end
   end
