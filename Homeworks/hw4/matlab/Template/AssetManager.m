@@ -165,7 +165,7 @@ classdef AssetManager < handle
       myIndex = abs(self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myPrice) - aP) < 0.01;
 
       if abs(aV) < self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(myIndex)
-        self.DepthHistory.(aISIN){end}.(myVolume)(myIndex) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(myIndex) - abs(aV);
+        self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(myIndex) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(myIndex) - abs(aV);
       else
         self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myVolume)(~myIndex);
         self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myPrice) = self.DepthHistory.(aISIN){self.CurrentIndex.(aISIN)}.(myPrice)(~myIndex);

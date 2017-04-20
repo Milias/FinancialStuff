@@ -23,7 +23,7 @@ classdef TradingRobot < AutoTrader
       %   dthmax :              maximum ticks we hold to the stock.
       %   dssmax :              maximum change of the stock's price before selling.
       %   dsbmax :              change in price before buying.
-      self.AlgoParams = struct('max_trading_volume', struct, 'lookback', 100, 'trigger_params', struct('dtsmax', 30, 'dtbmax', 30, 'dthmax', 10, 'dssmax', 0.0, 'dsbmax', 0.0), 'init_size', 40000);
+      self.AlgoParams = struct('max_trading_volume', struct, 'lookback', 100, 'trigger_params', struct('dtsmax', 30, 'dtbmax', 30, 'dthmax', 10, 'dssmax', 0.0, 'dsbmax', 0.0), 'init_size', 40000i, 'max_lag_window', 150);
 
       self.AlgoParams.max_trading_volume.DBK_EUR = 10;
       self.AlgoParams.max_trading_volume.CBK_EUR = 10;
@@ -70,12 +70,13 @@ classdef TradingRobot < AutoTrader
       self.TriggersData.TrendDetectionTrig.DataLabels = {'askLimitPrice', 'bidLimitPrice', 'askLimitPrice', 'bidLimitPrice'};
 
       %self.TriggersData.TrendDetectionTrig.DataFunctions = {@(data) sum(data.askLimitPrice .* data.askVolume)/sum(data.askVolume), @(data) sum(data.askVolume), @(data) sum(data.bidLimitPrice .* data.bidVolume)/sum(data.bidVolume), @(data) sum(data.bidVolume), @(data) min(data.askLimitPrice)};
-      self.TriggersData.TrendDetectionTrig.DataFunctions = {@(data) sum(data.askLimitPrice .* data.askVolume)/sum(data.askVolume), @(data) sum(data.bidLimitPrice .* data.bidVolume)/sum(data.bidVolume), @(data) min(data.askLimitPrice), @(data) max(data.bidLimitPrice)};
+     self.TriggersData.TrendDetectionTrig.DataFunctions = {@(data) sum(data.askLimitPrice .* data.askVolume)/sum(data.askVolume), @(data) sum(data.bidLimitPrice .* data.bidVolume)/sum(data.bidVolume), @(data) min(data.askLimitPrice), @(data) max(data.bidLimitPrice)};
       %self.TriggersData.TrendDetectionTrig.DataFunctions = {@(data) min(data.askLimitPrice), @(data) sum(data.askVolume), @(data) max(data.bidLimitPrice), @(data) sum(data.bidVolume), @(data) min(data.askLimitPrice)};
       %self.TriggersData.TrendDetectionTrig.DataFunctions = {@(data) min(data.askLimitPrice), @(data) min(data.bidLimitPrice), @(data) min(data.askLimitPrice)};
 
       self.TriggersData.TrendDetectionTrig.wa = cell(self.AlgoParams.init_size, length(self.AssetMgr.ISINs));
       self.TriggersData.TrendDetectionTrig.coef = cell(1, length(self.AssetMgr.ISINs));
+      self.TriggersData.TrendDetectionTrig.lag = zeros(self.AlgoParams.init_size, 1);
 
       for i = 1:length(self.AssetMgr.ISINs)
         self.TriggersData.TrendDetectionTrig.coef{1,i} = [0.1 0.4 0.8 ; 0.1 0.4 0.8 ; 1.0 0.0 0.0 ; 1.0 0.0 0.0];
@@ -89,9 +90,9 @@ classdef TradingRobot < AutoTrader
       self.Triggers{end + 1} = 'TrendTradeTrig';
       self.TriggersData.TrendTradeTrig = struct('tick_count_buy', 0, 'tick_count_sell', 0);
 
-      % == ReducePositionTrig ==
-      %self.Triggers{end + 1} = 'TradeMatchTrig';
-      self.TriggersData.TradeMatchTrig = struct('tick_count', 0);
+      % == CorrTrig ==
+      self.Triggers{end + 1} = 'CorrTrig';
+      self.TriggersData.CorrTrig = struct;
     end
 
     function HandleDepthUpdate(self, ~, aDepth)
@@ -147,11 +148,11 @@ classdef TradingRobot < AutoTrader
             if ~isempty(self.AssetMgr.ActiveTrades.(isin))
               mySide = -1;
 
-              for i = 1:length(myData.askLimitPrice)
-                myPrice = myData.askLimitPrice(i);
+              for k = 1:length(myData.askLimitPrice)
+                myPrice = myData.askLimitPrice(k);
                  
                 % We have to check each entry for a profitable price.
-                myProfits = self.CheckActiveTrades(isin, myData.askLimitPrice(i), mySide);
+                myProfits = self.CheckActiveTrades(isin, myData.askLimitPrice(k), mySide);
                   
                 if ~nnz(myProfits)
                   continue
@@ -162,7 +163,7 @@ classdef TradingRobot < AutoTrader
               
                 for j = 1:nnz(myProfits)
                   trade = self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)};
-                  myTrades = self.Trade(isin, myPrice, - mySide * min(myVol(i), abs(sum(trade.volume))));
+                  myTrades = self.Trade(isin, myPrice, - mySide * min(myVol(k), abs(sum(trade.volume))));
 
                   if myTrades
                     fprintf('TrendTradeTrig - WTB (complete)\n');
@@ -170,14 +171,14 @@ classdef TradingRobot < AutoTrader
                       
                     myTradedVolume = self.ownTrades.side(end-myTrades+1:end) .* self.ownTrades.volume(end-myTrades+1:end);
                     self.AssetMgr.UpdateTrade(isin, mySortedIdx(j), self.ownTrades.price(end-myTrades+1:end), myTradedVolume);
-                    myVol(i) = myVol(i) - abs(sum(myTradedVolume));
+                    myVol(k) = myVol(k) - abs(sum(myTradedVolume));
 
                     fprintf('After Pos: %3.0f, Profit: %6.2f\n\n', sum(self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.volume), -sum(self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.price .* self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.volume));
                       
                     self.AssetMgr.ArchiveCompletedTrades();
                   end
 
-                  if myVol(i) == 0
+                  if myVol(k) == 0
                     break
                   end
                 end
@@ -208,8 +209,8 @@ classdef TradingRobot < AutoTrader
             if ~isempty(self.AssetMgr.ActiveTrades.(isin))
               mySide = 1;
 
-              for i = 1:length(myData.bidLimitPrice)
-                myPrice = myData.bidLimitPrice(i);
+              for k = 1:length(myData.bidLimitPrice)
+                myPrice = myData.bidLimitPrice(k);
                  
                 % We have to check each entry for a profitable price.
                 myProfits = self.CheckActiveTrades(isin, myPrice, mySide);
@@ -223,7 +224,7 @@ classdef TradingRobot < AutoTrader
                   
                 for j = 1:nnz(myProfits)
                   trade = self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)};
-                  myTrades = self.Trade(isin, myPrice, - mySide * min(myVol(i), abs(sum(trade.volume))));
+                  myTrades = self.Trade(isin, myPrice, - mySide * min(myVol(k), abs(sum(trade.volume))));
 
                   if myTrades
                     fprintf('TrendTradeTrig - WTS (complete)\n');
@@ -231,7 +232,7 @@ classdef TradingRobot < AutoTrader
                      
                     myTradedVolume = self.ownTrades.side(end-myTrades+1:end) .* self.ownTrades.volume(end-myTrades+1:end);                   
                     self.AssetMgr.UpdateTrade(isin, mySortedIdx(j), self.ownTrades.price(end-myTrades+1:end), myTradedVolume);
-                    myVol(i) = myVol(i) - abs(sum(myTradedVolume));
+                    myVol(k) = myVol(k) - abs(sum(myTradedVolume));
 
                     fprintf('After Pos: %3.0f, Profit: %6.2f\n\n', sum(self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.volume), -sum(self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.price .* self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.volume));
                       
@@ -260,41 +261,16 @@ classdef TradingRobot < AutoTrader
       end
     end
 
-    function TradeMatchTrig(self)
-      for isin = self.AssetMgr.ISINs
-        isin = isin{1};
-
-        for i = 1:length(self.AssetMgr.ActiveTrades.(isin))
-          trade = self.AssetMgr.ActiveTrades.(isin){i};
-
-          myPos = sum(trade.volume);
-          if myPos < 0
-            myLabels = {'askLimitPrice', 'askVolume'};
-          else
-            myLabels = {'bidLimitPrice', 'bidVolume'};
-          end
-
-          myData = self.AssetMgr.GetDataFromHistory(isin, 0);
-
-          if length(myData{1}.(myLabels{1}))
-            if myData{1}.(myLabels{1})(1) > trade.price(1)
-              fprintf('Trade: %s, Before Pos: %3.0f\n', trade.uuid, sum(trade.volume));
-
-              myTrades = self.Trade(isin, myData{1}.(myLabels{1})(1), -min(myPos, myData{1}.(myLabels{2})(1)));
-
-              self.AssetMgr.ActiveTrades.(isin){i}.price = [ self.AssetMgr.ActiveTrades.(isin){i}.price ; self.ownTrades.price(end-myTrades+1:end) ];
-
-              self.AssetMgr.ActiveTrades.(isin){i}.volume = [ self.AssetMgr.ActiveTrades.(isin){i}.volume ; self.ownTrades.side(end-myTrades+1:end).*self.ownTrades.volume(end-myTrades+1:end) ];
-
-              fprintf('After Pos: %3.0f, Profit: %6.2f\n\n', sum(self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.volume), -sum(self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.price .* self.AssetMgr.ActiveTrades.(isin){mySortedIdx(j)}.volume));
-            end
-          end
-        end
+    function CorrTrig(self)
+      % The data used to compute the correlations will be the real data processed by self.Valuate(),
+      % so that there are no unusable values.
+      if self.AssetMgr.CurrentIndex.total < self.AlgoParams.max_lag_window || any(cellfun(@(isin) self.AssetMgr.CurrentIndex.(isin) < self.AlgoParams.max_lag_window, self.AssetMgr.ISINs))
+        return
       end
 
-      % fprintf('Before. Active: %d, Completed: %d\n', sum(cellfun(@(isin) length(self.AssetMgr.ActiveTrades.(isin)), self.AssetMgr.ISINs)), sum(cellfun(@(isin) length(self.AssetMgr.CompletedTrades.(isin)), self.AssetMgr.ISINs)))
-      self.AssetMgr.ArchiveCompletedTrades();
-      % fprintf('After. Active: %d, Completed: %d\n', sum(cellfun(@(isin) length(self.AssetMgr.ActiveTrades.(isin)), self.AssetMgr.ISINs)), sum(cellfun(@(isin) length(self.AssetMgr.CompletedTrades.(isin)), self.AssetMgr.ISINs)))
+      myData = cellfun(@(i) self.TriggersData.TrendDetectionTrig.wa{self.AssetMgr.CurrentIndex.total-self.AlgoParams.max_lag_window:self.AssetMgr.CurrentIndex.total, i}, 1:length(self.AssetMgr.ISINs));
+
+
     end 
 
     function TrendDetectionTrig(self)
@@ -337,6 +313,9 @@ classdef TradingRobot < AutoTrader
         end
         self.TriggersData.TrendDetectionTrig.wa{self.AssetMgr.CurrentIndex.total, j} = myWA;
       end
+
+
+
     end
 
     function theValues = Valuate(self)
@@ -409,3 +388,13 @@ function result = iff(condition,trueResult,falseResult)
     result = falseResult;
   end
 end
+
+function theLag = CorrTrig(x, y, n_window)
+  [xcf, lags, bounds] = crosscorr(x, y, n_window, 3);
+  [argVal, argMax] = max(xcf);
+  if abs(argVal) < bounds(1)
+    theLag = nan;
+  else
+    theLag = lags(argMax);
+  end
+end 
