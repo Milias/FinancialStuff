@@ -81,7 +81,7 @@
 
   The trading algorithm is implemented in three separate steps, executed every time there is a book update. These three steps are \emph{offers and bids checking}, \emph{trading} and \emph{book updating}, each of them explained in the following sections.
 
-  We consider each book to be a set of price and volume pairs, that we denote as $(P^{a,b}_i, V^{a,b}_i)$, where the superscript $a, b$ refer to \emph{ask} and \emph{bid} respectively, and $i\in [1, N_{a,b}]$ is the index of the entry. In a more general setting we would also want to specify the market, however in this case there are only two options: buying \texttt{CHI\_AKZA} and selling \texttt{EUR\_AKZA} or the opposite, so references to bids or asks are implicitly connected to the right market.  
+  We consider each book to be a set of price and volume pairs, that we denote as $(P^{a,b}_i, V^{a,b}_i)$, where the superscript $a, b$ refer to \emph{ask} and \emph{bid} respectively, and $i\in [1, N_{a,b}]$ is the index of the entry. In a more general setting we would also want to specify the market, however in this case there are only two options: buying \texttt{CHI\_AKZA} and selling \texttt{EUR\_AKZA} or the opposite, so references to bids or asks are implicitly connected to the right market.
 
   \paragraph{Offers and bids checking}
 
@@ -129,6 +129,13 @@
   Finally we can proceed to perform the last step of the implementation: update the books. After every successful transaction the market changes, but in the next book update only one of the books will be saved. This means that we need to manually modify the stored book after selling and buying, so that the algorithm doesn't get tricked into sending the same transaction into the market several times.
 
   We achieve this by looking up the entry by price and either removing it completely if the volume moved is maximum, or adjusting it if it isn't.
+
+\paragraph{Using the correlation}
+
+To use the correlation of the the two stocks we first have to determine the correlation $\delta t$. Once we know $\delta t$ we can detect minima and maxima in the first share and we can use that knowledge to predict the minima and maxima in the other share.
+When we have predicted maxima and minima we can buy and sell accordingly.
+%https://nl.mathworks.com/help/signal/ref/xcorr.html?requestedDomain=www.mathworks.com
+
 
   \section{Results}
 
