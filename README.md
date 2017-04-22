@@ -12,5 +12,5 @@ In no specific order.
 * Implement algorithm to use correlation information.
 * Implement self-correcting algorithm for the trend coefficients.
 * Stop-loss algorithm.
-* Have more than one trade at the same time.
+* ~Multitrading~.
 
