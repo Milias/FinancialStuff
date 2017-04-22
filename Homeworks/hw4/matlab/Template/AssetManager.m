@@ -22,14 +22,14 @@ classdef AssetManager < handle
       % Struct where trades are stored.
       self.ActiveTrades = struct;
       self.CompletedTrades = struct;
-      
+
       % Struct of vectors containing depths for each ISIN.
       % Structure: self.DepthHistory.ISIN = {}.
       self.DepthHistory = struct;
-      
+
       % Vector of stored ISINs.
       self.ISINs = cell(0);
-    
+
       % Keeping track of how many book updates we've received.
       % Total,  and one index per ISIN.
       self.CurrentIndex = struct('total', 1);
@@ -85,7 +85,7 @@ classdef AssetManager < handle
     end
 
     function theProfit = GetComplProfit(self, aISIN)
-      theProfit = sum(cellfun(@(trade) sum(trade.price), self.CompletedTrades.(aISIN)));
+      theProfit = -sum(cellfun(@(trade) sum(trade.volume .* trade.price), self.CompletedTrades.(aISIN)));
     end
 
     function UpdateDepths(self, aDepth)
@@ -119,7 +119,7 @@ classdef AssetManager < handle
     end
 
     function GenerateNewTrade(self, aISIN, aP, aV)
-      self.ActiveTrades.(aISIN){end+1} = struct('price', [aP], 'volume', [aV], 'time', [self.CurrentIndex.total], 'uuid', {char(java.util.UUID.randomUUID)});
+      self.ActiveTrades.(aISIN){end+1} = struct('price', [aP], 'volume', [aV], 'time', arrayfun(@(p) self.CurrentIndex.total, aP), 'uuid', {char(java.util.UUID.randomUUID)});
       %fprintf('Trade added\n')
       fprintf('Trade (%7s, %5.2f, %3.0f, %s) added.\n', aISIN, mean(aP), sum(aV), self.ActiveTrades.(aISIN){end}.uuid)
     end

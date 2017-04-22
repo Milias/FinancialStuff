@@ -2,20 +2,30 @@ classdef Profiler < handle
   properties
     TimersData
     TimersTic
+    TimersCheck
   end
 
   methods
     function self = Profiler
       self.TimersData = struct;
       self.TimersTic = struct;
+      self.TimersCheck = struct;
     end
 
     function delete(self)
       clear self.TimersData;
       clear self.TimersTic;
+      clear self.TimersCheck;
     end
 
     function StartTimer(self, aTimer)
+      if isfield(self.TimersCheck, aTimer)
+        if self.TimersCheck.(aTimer)
+          fprintf('WARNING: last timer from %s not unchecked.\n\n', aTimer)
+          error('Stoping')
+        end
+      end
+      self.TimersCheck.(aTimer) = 1;
       self.TimersTic.(aTimer) = tic;
     end
 
@@ -27,6 +37,8 @@ classdef Profiler < handle
         self.TimersData.(aTimer).Time = toc(self.TimersTic.(aTimer));
         self.TimersData.(aTimer).Count = 1;
       end
+
+      self.TimersCheck.(aTimer) = 0;
     end
 
     function PrintAll(self)
