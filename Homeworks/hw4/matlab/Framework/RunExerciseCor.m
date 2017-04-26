@@ -10,13 +10,21 @@ myFeedPublisher = FeedPublisher();
 myExchange.RegisterAutoTrader(myFeedPublisher);
 myFeedPublisher.StartAutoTrader(myExchange);
 
-%myTradingRobot = PlotFeedRobot(); 
 myTradingRobot = TradingRobot();
 myExchange.RegisterAutoTrader(myTradingRobot);
 myTradingRobot.StartAutoTrader(myExchange);
 
-myFeedPublisher.StartShortFeed(myFeed);
+%myFeedPublisher.StartFeed(FeedSubset(myFeed, 2000));
+myFeedPublisher.StartFeed(myFeed);
 
 myTradingRobot.Unwind();
-%ReportFeedHist(myTradingRobot);
 Report(myTradingRobot.ownTrades);
+
+function theFeed = FeedSubset(aFeed, aT)
+  theFeed = struct;
+  myFieldNames = fieldnames(aFeed);
+  for i = 1:length(myFieldNames)
+    field = myFieldNames{i};
+    theFeed.(field) = aFeed.(field)(1:aT);
+  end
+end

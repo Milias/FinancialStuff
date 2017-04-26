@@ -7,7 +7,6 @@ function Report(aTrades)
     myTimePerf.cash = cumsum(- aTrades.side .* aTrades.price .* aTrades.volume);
 
     x = 1:size(myTimePerf.assets, 1);
-    %plot(x, myTimePerf.assets, 'r-', x, myTimePerf.cash, 'b-', 'LineWidth', 2)
 
     myData = struct('assets', [ 0 0 ; 0 0 ], 'cash', [ 0 0 ; 0 0 ]);
 

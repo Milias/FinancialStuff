@@ -22,7 +22,6 @@ classdef Profiler < handle
       if isfield(self.TimersCheck, aTimer)
         if self.TimersCheck.(aTimer)
           fprintf('WARNING: last timer from %s not unchecked.\n\n', aTimer)
-          error('Stoping')
         end
       end
       self.TimersCheck.(aTimer) = 1;
