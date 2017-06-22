@@ -14,3 +14,4 @@ In no specific order.
 * Stop-loss algorithm.
 * ~Multitrading~.
 
+Nope.
